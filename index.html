@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incentivale · Analytics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0918;--bg2:#110e22;--bg3:#1a1535;
+  --card:rgba(255,255,255,.04);--card-h:rgba(255,255,255,.07);
+  --border:rgba(255,255,255,.07);--border-p:rgba(139,92,246,.35);
+  --p1:#7c3aed;--p2:#8b5cf6;--p3:#a78bfa;--p4:#c084fc;
+  --gold:#f59e0b;--cyan:#22d3ee;--green:#10b981;--red:#f43f5e;--blue:#3b82f6;
+  --txt:#f1f0ff;--txt2:rgba(241,240,255,.6);--txt3:rgba(241,240,255,.32);
+  --r:14px;--r2:10px;--r3:6px;
+  --shadow:0 0 40px rgba(124,58,237,.18);
+  --ff:'Syne',sans-serif;--fb:'DM Sans',sans-serif;
+  --sw:240px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--txt);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%,rgba(124,58,237,.12) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 60% at 85% 85%,rgba(76,29,149,.15) 0%,transparent 60%),
+    radial-gradient(ellipse 35% 35% at 50% 45%,rgba(192,132,252,.04) 0%,transparent 70%);
+}
+
+/* LOADING */
+#loadScreen{
+  position:fixed;inset:0;z-index:9999;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  transition:opacity .5s ease;
+}
+#loadScreen.hidden{opacity:0;pointer-events:none;}
+.ll{font-family:var(--ff);font-size:26px;font-weight:800;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.ls{font-size:10px;color:var(--txt3);letter-spacing:3px;text-transform:uppercase;}
+.lb-w{width:240px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+.lb{height:100%;background:linear-gradient(90deg,var(--p1),var(--p4));border-radius:2px;animation:ldAnim 1.8s ease forwards;}
+@keyframes ldAnim{from{width:0}to{width:100%}}
+.lt{font-size:12px;color:var(--txt3);}
+
+/* SIDEBAR */
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:var(--sw);
+  background:rgba(12,9,24,.97);border-right:1px solid var(--border);
+  backdrop-filter:blur(20px);z-index:100;
+  display:flex;flex-direction:column;padding:24px 0;
+  transition:transform .3s ease;
+}
+.logo{padding:0 22px 22px;border-bottom:1px solid var(--border);}
+.logo-m{display:flex;align-items:center;gap:10px;}
+.logo-ic{
+  width:32px;height:32px;border-radius:9px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--p1),var(--p4));
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+}
+.logo-t{font-family:var(--ff);font-weight:800;font-size:17px;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-s{font-size:10px;color:var(--txt3);letter-spacing:2.5px;text-transform:uppercase;margin-top:3px;}
+.nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.nav-lbl{font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--txt3);
+  padding:12px 12px 5px;font-weight:600;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r2);
+  cursor:pointer;color:var(--txt2);font-size:13px;font-weight:500;
+  border:1px solid transparent;transition:all .18s;user-select:none;
+}
+.nav-item:hover{background:var(--card-h);color:var(--txt);border-color:var(--border);}
+.nav-item.active{background:rgba(124,58,237,.15);color:var(--p3);border-color:rgba(124,58,237,.28);}
+.nav-ico{font-size:14px;width:17px;text-align:center;flex-shrink:0;}
+.sb-foot{padding:16px 22px;border-top:1px solid var(--border);}
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.22);
+  color:#10b981;font-size:11px;padding:5px 11px;border-radius:20px;font-weight:500;
+}
+.live-dot{width:6px;height:6px;background:#10b981;border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.4);}}
+
+/* MAIN */
+.main{margin-left:var(--sw);min-height:100vh;position:relative;z-index:1;}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;border-bottom:1px solid var(--border);
+  background:rgba(12,9,24,.85);backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:50;
+}
+.pg-title{font-family:var(--ff);font-size:18px;font-weight:700;}
+.pg-sub{font-size:11px;color:var(--txt3);margin-top:2px;}
+.tb-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.fsel{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--txt2);font-family:var(--fb);font-size:12.5px;padding:7px 12px;
+  cursor:pointer;outline:none;transition:all .18s;
+}
+.fsel:hover,.fsel:focus{border-color:var(--border-p);color:var(--txt);}
+.btn{
+  font-family:var(--fb);font-size:12.5px;font-weight:600;
+  padding:7px 15px;border-radius:var(--r2);cursor:pointer;
+  border:1px solid;transition:all .2s;
+}
+.btn-p{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:var(--p3);}
+.btn-p:hover{background:rgba(124,58,237,.25);box-shadow:0 0 18px rgba(124,58,237,.25);}
+.btn-g{background:transparent;border-color:var(--border);color:var(--txt2);}
+.btn-g:hover{background:var(--card-h);color:var(--txt);}
+
+/* CONTENT */
+.content{padding:24px 28px;}
+.pg{display:none;animation:fadeUp .3s ease;}
+.pg.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* INSIGHTS */
+.insights{display:flex;gap:10px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px;}
+.insight{
+  flex-shrink:0;background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.18);
+  border-radius:20px;padding:7px 14px;font-size:12px;color:var(--txt2);
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.insight b{color:var(--p4);}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(124,58,237,.3);border-radius:2px;}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px;}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px 22px;position:relative;overflow:hidden;
+  transition:transform .25s,box-shadow .25s,border-color .25s;cursor:default;
+}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--ka,linear-gradient(90deg,var(--p1),var(--p4)));}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--border-p);}
+.kpi.gold{--ka:linear-gradient(90deg,#f59e0b,#fcd34d);}
+.kpi.cyan{--ka:linear-gradient(90deg,#22d3ee,#67e8f9);}
+.kpi.green{--ka:linear-gradient(90deg,#10b981,#34d399);}
+.kpi.red{--ka:linear-gradient(90deg,#f43f5e,#fb7185);}
+.kpi.blue{--ka:linear-gradient(90deg,#3b82f6,#93c5fd);}
+.kpi-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3);
+  font-weight:700;margin-bottom:10px;}
+.kpi-val{font-family:var(--ff);font-size:26px;font-weight:800;color:var(--txt);line-height:1.1;margin-bottom:8px;}
+.kpi-val.sm{font-size:18px;}
+.kpi-delta{
+  display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;
+  padding:3px 8px;border-radius:20px;
+}
+.up{background:rgba(16,185,129,.12);color:#10b981;}
+.dn{background:rgba(244,63,94,.12);color:#f43f5e;}
+
+/* CARDS/CHARTS */
+.row{display:grid;gap:18px;margin-bottom:18px;}
+.r2{grid-template-columns:1fr 1fr;}
+.r3{grid-template-columns:2fr 1fr;}
+.r32{grid-template-columns:1fr 2fr;}
+.r1{grid-template-columns:1fr;}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:22px;transition:border-color .25s;
+}
+.card:hover{border-color:var(--border-p);}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.card-title{font-family:var(--ff);font-size:14px;font-weight:700;color:var(--txt);}
+.card-sub{font-size:11px;color:var(--txt3);margin-top:3px;}
+.badge{
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;
+  background:rgba(124,58,237,.12);color:var(--p3);border:1px solid rgba(124,58,237,.2);
+}
+.badge.gold{background:rgba(245,158,11,.12);color:#f59e0b;border-color:rgba(245,158,11,.2);}
+.badge.green{background:rgba(16,185,129,.12);color:#10b981;border-color:rgba(16,185,129,.2);}
+
+/* CHART WRAPPERS — altura fixa, sem expansão */
+.cw{position:relative;width:100%;}
+.h180{height:180px;} .h200{height:200px;} .h220{height:220px;}
+.h240{height:240px;} .h260{height:260px;} .h280{height:280px;} .h300{height:300px;}
+canvas{display:block;}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto;}
+.tbl-tools{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+.srch{
+  background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--txt2);font-family:var(--fb);font-size:12.5px;padding:7px 13px;
+  outline:none;width:200px;transition:all .18s;
+}
+.srch:focus{border-color:var(--border-p);color:var(--txt);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  padding:9px 13px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--txt3);font-weight:700;border-bottom:1px solid var(--border);text-align:left;
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+thead th:hover{color:var(--p3);}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .14s;}
+tbody tr:hover{background:rgba(255,255,255,.03);}
+tbody td{padding:10px 13px;color:var(--txt2);vertical-align:middle;}
+tbody td:first-child{color:var(--txt);}
+.td-n{font-weight:600;color:var(--txt);}
+.td-p{font-family:var(--ff);font-weight:700;color:var(--p3);}
+.td-v{font-family:var(--ff);font-weight:700;color:var(--gold);}
+.rk{display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:7px;font-weight:800;font-size:11px;}
+.r1c{background:rgba(245,158,11,.2);color:#f59e0b;}
+.r2c{background:rgba(148,163,184,.15);color:#94a3b8;}
+.r3c{background:rgba(180,83,9,.2);color:#d97706;}
+.rnc{background:rgba(255,255,255,.06);color:var(--txt3);}
+.pb-w{display:flex;align-items:center;gap:8px;min-width:110px;}
+.pb{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+.pf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--p1),var(--p4));transition:width 1.2s ease;}
+.pf.g{background:linear-gradient(90deg,#10b981,#34d399);}
+.pf.gold{background:linear-gradient(90deg,#f59e0b,#fcd34d);}
+.pf.c{background:linear-gradient(90deg,#22d3ee,#67e8f9);}
+.pv{font-size:11px;color:var(--txt3);min-width:32px;text-align:right;}
+.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.pill-on{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2);}
+.pill-off{background:rgba(244,63,94,.1);color:#f43f5e;border:1px solid rgba(244,63,94,.2);}
+
+/* REGIONAL */
+.reg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.reg-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--r2);
+  padding:14px 16px;cursor:pointer;transition:all .2s;
+}
+.reg-card:hover{background:rgba(124,58,237,.08);border-color:var(--border-p);}
+.reg-nm{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3);font-weight:700;margin-bottom:6px;}
+.reg-vl{font-family:var(--ff);font-size:19px;font-weight:800;color:var(--p3);}
+.reg-mt{font-size:11px;color:var(--txt3);margin-top:4px;display:flex;gap:10px;}
+.reg-mt span{color:var(--txt2);}
+
+/* YEAR TABS */
+.ytabs{display:flex;gap:4px;margin-bottom:14px;}
+.ytab{
+  font-size:12px;font-weight:600;padding:6px 14px;border-radius:var(--r2);
+  cursor:pointer;color:var(--txt2);border:1px solid var(--border);background:transparent;
+  transition:all .18s;
+}
+.ytab.active{background:rgba(124,58,237,.18);color:var(--p3);border-color:var(--border-p);}
+
+/* PAG */
+.pag{display:flex;align-items:center;gap:8px;margin-top:14px;justify-content:flex-end;}
+.pag-btn{
+  background:var(--card);border:1px solid var(--border);color:var(--txt2);
+  font-family:var(--fb);font-size:12px;padding:5px 11px;border-radius:var(--r3);
+  cursor:pointer;transition:all .15s;
+}
+.pag-btn:hover:not(:disabled){background:var(--card-h);border-color:var(--border-p);color:var(--p3);}
+.pag-btn:disabled{opacity:.3;cursor:default;}
+.pag-info{font-size:11px;color:var(--txt3);}
+
+/* MOBILE */
+.mob-toggle{
+  display:none;position:fixed;top:14px;left:14px;z-index:200;
+  background:var(--p1);border:none;border-radius:10px;color:#fff;
+  width:38px;height:38px;font-size:17px;cursor:pointer;
+  align-items:center;justify-content:center;
+}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
+
+@media(max-width:1080px){.r2,.r3,.r32{grid-template-columns:1fr;}.reg-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .overlay.open{display:block;}
+  .main{margin-left:0;} .mob-toggle{display:flex;}
+  .content{padding:16px 14px;} .topbar{padding:12px 14px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);} .tb-right{display:none;}
+  .reg-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loadScreen">
+  <div class="ll">Incentivale</div>
+  <div class="ls">Analytics Hub</div>
+  <div class="lb-w"><div class="lb"></div></div>
+  <div class="lt" id="lts">Carregando dados…</div>
+</div>
+
+<button class="mob-toggle" id="mobTgl">☰</button>
+<div class="overlay" id="ovl" onclick="closeSB()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-m">
+      <div class="logo-ic">⬡</div>
+      <div class="logo-t">Incentivale</div>
+    </div>
+    <div class="logo-s">Analytics Hub</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-lbl">Visões</div>
+    <div class="nav-item active" data-page="executivo"><span class="nav-ico">◈</span> Executivo</div>
+    <div class="nav-item" data-page="financeiro"><span class="nav-ico">◉</span> Financeiro</div>
+    <div class="nav-item" data-page="campanhas"><span class="nav-ico">◎</span> Campanhas</div>
+    <div class="nav-item" data-page="regional"><span class="nav-ico">◐</span> Regional</div>
+    <div class="nav-item" data-page="vendedores"><span class="nav-ico">◑</span> Vendedores</div>
+    <div class="nav-lbl">Analytics</div>
+    <div class="nav-item" data-page="temporal"><span class="nav-ico">▲</span> Temporal</div>
+    <div class="nav-item" data-page="ranking"><span class="nav-ico">◆</span> Ranking</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="live-badge"><span class="live-dot"></span> Dados em tempo real</div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="pg-title" id="pgTitle">Visão Executiva</div>
+      <div class="pg-sub" id="pgSub">Consolidado real — Fev/2023 a Mai/2026</div>
+    </div>
+    <div class="tb-right">
+      <select class="fsel" id="fAno"><option value="todos">Todos os Anos</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select>
+      <select class="fsel" id="fReg"><option value="todos">Todas Regionais</option><option value="SUL">SUL</option><option value="NNE">NNE</option><option value="RIO">RIO</option><option value="CTO">CTO</option><option value="SPR">SPR</option><option value="SPC">SPC</option></select>
+      <button class="btn btn-p" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-g" onclick="updateFromXLSX()">↺ Atualizar</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- EXECUTIVO -->
+    <div class="pg active" id="pg-executivo">
+      <div class="insights" id="insStr"></div>
+      <div class="kpi-grid" id="kpiExec"></div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Pontos Creditados — Evolução Mensal</div><div class="card-sub">Série histórica completa 2023–2026</div></div><div class="badge">Timeline</div></div>
+          <div class="cw h200"><canvas id="chTL"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Pontos por Regional</div><div class="card-sub">Distribuição total acumulada</div></div><div class="badge gold">Regional</div></div>
+          <div class="cw h200"><canvas id="chRB"></canvas></div>
+        </div>
+      </div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Pontos por Área de Negócio</div><div class="card-sub">Distribuição percentual por área</div></div><div class="badge">Área</div></div>
+          <div class="cw h220"><canvas id="chAD"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Pontos por Ano</div><div class="card-sub">Comparativo anual acumulado</div></div><div class="badge green">YoY</div></div>
+          <div class="cw h220"><canvas id="chYY"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANCEIRO -->
+    <div class="pg" id="pg-financeiro">
+      <div class="kpi-grid" id="kpiFin"></div>
+      <div class="row r1">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Verba vs Atribuído por Área</div><div class="card-sub">Comparativo financeiro por área</div></div><div class="badge gold">Financeiro</div></div>
+          <div class="cw h240"><canvas id="chFA"></canvas></div>
+        </div>
+      </div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">% Utilização da Verba por Área</div><div class="card-sub">Atribuído ÷ Verba × 100</div></div></div>
+          <div class="cw h220"><canvas id="chUtil"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Top Campanhas — Maior Verba</div><div class="card-sub">15 campanhas com maior orçamento</div></div></div>
+          <div class="tbl-wrap">
+            <table id="tFC"><thead><tr><th>#</th><th>Campanha</th><th>Área</th><th onclick="sT('tFC',3)">Verba ↕</th><th onclick="sT('tFC',4)">Atribuído ↕</th><th>Status</th></tr></thead><tbody id="bFC"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAMPANHAS -->
+    <div class="pg" id="pg-campanhas">
+      <div class="kpi-grid" id="kpiCamp"></div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Top 20 Campanhas — Volume de Pontos</div><div class="card-sub">Maior distribuição de pontos</div></div></div>
+          <div class="cw h280"><canvas id="chTC"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Campanhas Estrelas Turbinadas</div><div class="card-sub">Série recorrente — todas as edições</div></div></div>
+          <div class="cw h280"><canvas id="chES"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tbl-tools">
+          <div class="card-title">Todas as Campanhas</div>
+          <input class="srch" type="text" placeholder="Buscar campanha…" oninput="fTbl('bAC',this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table id="tAC"><thead><tr><th>#</th><th onclick="sT('tAC',1)">Campanha ↕</th><th onclick="sT('tAC',2)">Pontos ↕</th><th onclick="sT('tAC',3)">Participantes ↕</th><th onclick="sT('tAC',4)">Transações ↕</th></tr></thead><tbody id="bAC"></tbody></table>
+        </div>
+        <div class="pag" id="pagC"></div>
+      </div>
+    </div>
+
+    <!-- REGIONAL -->
+    <div class="pg" id="pg-regional">
+      <div class="kpi-grid" id="kpiReg"></div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Comparativo Regional</div><div class="card-sub">Pontos, Ativos e Cadastros por regional</div></div></div>
+          <div class="reg-grid" id="regCards"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Pontos por Estado (Top 10)</div><div class="card-sub">Distribuição geográfica acumulada</div></div><div class="badge">UF</div></div>
+          <div class="cw h260"><canvas id="chEst"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Cadastros por Estado (Top 10)</div><div class="card-sub">Base de vendedores por UF</div></div></div>
+        <div class="cw h180"><canvas id="chCE"></canvas></div>
+      </div>
+    </div>
+
+    <!-- VENDEDORES -->
+    <div class="pg" id="pg-vendedores">
+      <div class="kpi-grid" id="kpiVend"></div>
+      <div class="card">
+        <div class="tbl-tools">
+          <div class="card-title">Top 50 Vendedores — Volume de Pontos</div>
+          <input class="srch" type="text" placeholder="Buscar vendedor…" oninput="fTbl('bVend',this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table id="tVend"><thead><tr><th>Rank</th><th onclick="sT('tVend',1)">Vendedor ↕</th><th onclick="sT('tVend',2)">Regional ↕</th><th onclick="sT('tVend',3)">Estado ↕</th><th onclick="sT('tVend',4)">Pontos ↕</th><th>Participação</th></tr></thead><tbody id="bVend"></tbody></table>
+        </div>
+        <div class="pag" id="pagV"></div>
+      </div>
+    </div>
+
+    <!-- TEMPORAL -->
+    <div class="pg" id="pg-temporal">
+      <div class="kpi-grid" id="kpiTemp"></div>
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head"><div><div class="card-title">Evolução Mensal — Comparativo por Ano</div><div class="card-sub">2023 vs 2024 vs 2025 — Pontos creditados por mês</div></div><div class="badge">Comparativo</div></div>
+        <div class="ytabs">
+          <button class="ytab active" onclick="tgY('2023',this)">2023</button>
+          <button class="ytab active" onclick="tgY('2024',this)">2024</button>
+          <button class="ytab active" onclick="tgY('2025',this)">2025</button>
+        </div>
+        <div class="cw h220"><canvas id="chCmp"></canvas></div>
+      </div>
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Timeline Completa 2023–2026</div><div class="card-sub">Série histórica de pontos creditados</div></div></div>
+          <div class="cw h200"><canvas id="chTLA"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Volume por Trimestre</div><div class="card-sub">Sazonalidade trimestral acumulada</div></div></div>
+          <div class="cw h200"><canvas id="chTrim"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RANKING -->
+    <div class="pg" id="pg-ranking">
+      <div class="row r2">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">🏆 Top 20 Vendedores</div><div class="card-sub">Por volume total de pontos</div></div></div>
+          <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Vendedor</th><th>Regional</th><th>Pontos</th></tr></thead><tbody id="rkV"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">🏆 Ranking Regional</div><div class="card-sub">Posição por volume de pontos</div></div></div>
+          <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Regional</th><th>Pontos</th><th>Ativos</th><th>Part.</th></tr></thead><tbody id="rkR"></tbody></table></div>
+          <div class="card-head" style="margin-top:22px"><div><div class="card-title">🏆 Top 10 Campanhas</div><div class="card-sub">Por volume de pontos distribuídos</div></div></div>
+          <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Campanha</th><th>Pontos</th></tr></thead><tbody id="rkC"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+//  DADOS EMBUTIDOS — gerados automaticamente dos XLSXs reais
+// ═══════════════════════════════════════════════════════════
+const EMBED = {"kpis":{"total_credito":137699503.51,"total_debito":2832878.0,"saldo_pontos":134866625.51,"total_verba":78728391.63,"total_atribuido":13600384.74,"total_saldo_fin":65128006.89,"total_campanhas":401,"total_vendedores":2078,"vendedores_ativos":1642,"ticket_medio":2272.83,"roi_pct":17.28,"engajamento_pct":79.02,"contratos_sim":1723},"tl_labels":["2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"],"tl_credito":[6604734,8110636,2332540,3593031,2847261,1932082,1922544,3727350,1677479,3881290,3248630,8497190,1906276,3532600,3451392,3703014,3563530,1724625,4517153,4151080,3799590,1812700,6753795,2936620,938925,2704970,2762560,3578420,4443510,4054190,4089680,3166145,4654920,3745730,4572040,5051780,1477890,59550,1170200,1001850],"monthly_2023":[0,6604734,8110636,2332540,3593031,2847261,1932082,1922544,3727350,1677479,3881290,3248630],"monthly_2024":[8497190,1906276,3532600,3451392,3703014,3563530,1724625,4517153,4151080,3799590,1812700,6753795],"monthly_2025":[2936620,938925,2704970,2762560,3578420,4443510,4054190,4089680,3166145,4654920,3745730,4572040],"monthly_2026":[5051780,1477890,59550,1170200,1001850,0,0,0,0,0,0,0],"trim_labels":["2023 T1","2023 T2","2023 T3","2023 T4","2024 T1","2024 T2","2024 T3","2024 T4","2025 T1","2025 T2","2025 T3","2025 T4","2026 T1","2026 T2"],"trim_vals":[14715125,8772829,7581976,8807399,13936066,10717936,10392858,12366085,6580515,10784490,11310015,12972690,6589220,2172050],"regionais":[{"regional":"SUL","pontos":28897105,"ativos":343,"cadastros":460},{"regional":"NNE","pontos":25719255,"ativos":284,"cadastros":297},{"regional":"RIO","pontos":24693513,"ativos":199,"cadastros":214},{"regional":"CTO","pontos":23451372,"ativos":269,"cadastros":284},{"regional":"SPR","pontos":19401164,"ativos":266,"cadastros":285},{"regional":"SPC","pontos":15229246,"ativos":221,"cadastros":230}],"vendedores":[{"rank":1,"nome":"Fernando Jose dos Santos","regional":"RIO","estado":"BA","pontos":553826},{"rank":2,"nome":"Manuel Aspera Amoedo Maia","regional":"RIO","estado":"BA","pontos":542669},{"rank":3,"nome":"Marcos Amancio de Sena","regional":"RIO","estado":"BA","pontos":522776},{"rank":4,"nome":"Vando Duarte Silva","regional":"RIO","estado":"RJ","pontos":495008},{"rank":5,"nome":"Guilherme dos Santos","regional":"RIO","estado":"RJ","pontos":491616},{"rank":6,"nome":"Gerson Sichelero","regional":"SUL","estado":"RS","pontos":454457},{"rank":7,"nome":"EDIVALSO BATISTA DE LIMA","regional":"CTO","estado":"MT","pontos":441664},{"rank":8,"nome":"JOAQUIM ANTONIO CESARIO DE JESUS","regional":"CTO","estado":"GO","pontos":425266},{"rank":9,"nome":"Alberto da Silva Costa Filho","regional":"NNE","estado":"TO","pontos":422808},{"rank":10,"nome":"Evandro Cezar Gervoni","regional":"SPR","estado":"SP","pontos":421759},{"rank":11,"nome":"Michel da Silva Cardoso","regional":"SUL","estado":"RS","pontos":403322},{"rank":12,"nome":"Douglas Guimaraes Lima","regional":"RIO","estado":"RJ","pontos":402907},{"rank":13,"nome":"Geovane de Oliveira Rios","regional":"RIO","estado":"BA","pontos":396762},{"rank":14,"nome":"Fabio David Tavares","regional":"SPC","estado":"SP","pontos":393467},{"rank":15,"nome":"Audson Luiz de Moura","regional":"NNE","estado":"PE","pontos":390386},{"rank":16,"nome":"Tiago Mori Vasconcelos","regional":"SPC","estado":"SP","pontos":385442},{"rank":17,"nome":"Bruno Soares Amaro","regional":"NNE","estado":"CE","pontos":385048},{"rank":18,"nome":"Laerti Cabral da Silva","regional":"RIO","estado":"RJ","pontos":383131},{"rank":19,"nome":"Joao Luiz Florencio de Souza Freitas","regional":"NNE","estado":"PE","pontos":379929},{"rank":20,"nome":"Saulo Pimentel dos Santos","regional":"RIO","estado":"PE","pontos":374760},{"rank":21,"nome":"Renato Fialho da Costa","regional":"SPC","estado":"SP","pontos":370769},{"rank":22,"nome":"Elizeu Maschio","regional":"SUL","estado":"RS","pontos":367083},{"rank":23,"nome":"Jose Cabral de Oliveira Filho","regional":"RIO","estado":"RJ","pontos":366575},{"rank":24,"nome":"Marcus Vinicius de Souza Rocha","regional":"RIO","estado":"RJ","pontos":364513},{"rank":25,"nome":"Marcus Venicius de Carvalho Ornellas","regional":"RIO","estado":"BA","pontos":361509},{"rank":26,"nome":"Quesia Ribeiro Dantas","regional":"RIO","estado":"RJ","pontos":359805},{"rank":27,"nome":"Fernando Nunes Cinquinis","regional":"RIO","estado":"RJ","pontos":355292},{"rank":28,"nome":"Irenio Soares de Almeida Junior","regional":"RIO","estado":"BA","pontos":354127},{"rank":29,"nome":"Claudio Pereira dos Santos","regional":"SPC","estado":"SP","pontos":353825},{"rank":30,"nome":"Amorildo Alcantara Souza","regional":"RIO","estado":"BA","pontos":349491},{"rank":31,"nome":"Isaque de Oliveira Agert","regional":"SUL","estado":"RS","pontos":348286},{"rank":32,"nome":"Luiz Alberto Ferreira","regional":"RIO","estado":"RJ","pontos":347941},{"rank":33,"nome":"Miqueias Muller","regional":"SUL","estado":"SC","pontos":336237},{"rank":34,"nome":"Jose Marcos Carneiro de Oliveira","regional":"NNE","estado":"CE","pontos":334684},{"rank":35,"nome":"Andre Flores dos Santos","regional":"SPC","estado":"SP","pontos":333916},{"rank":36,"nome":"RICARDO GUARIENTI","regional":"CTO","estado":"MT","pontos":333247},{"rank":37,"nome":"Thiago Teixeira Aguilera","regional":"RIO","estado":"RJ","pontos":333090},{"rank":38,"nome":"Jose Edson Ferreira Gomes","regional":"SPC","estado":"SP","pontos":329069},{"rank":39,"nome":"Rafael Antonio Sangaletti Lau","regional":"SPR","estado":"SP","pontos":324491},{"rank":40,"nome":"Josean Iatauro Junior","regional":"RIO","estado":"RJ","pontos":324425},{"rank":41,"nome":"Leandro Luis da Silva","regional":"SPC","estado":"SP","pontos":323833},{"rank":42,"nome":"Cleiton dos Santos Sousa","regional":"NNE","estado":"PA","pontos":323621},{"rank":43,"nome":"Tiago Sampaio dos Santos  ","regional":"RIO","estado":"BA","pontos":317491},{"rank":44,"nome":"Jezonias Lemos Peixoto","regional":"SPC","estado":"SP","pontos":315774},{"rank":45,"nome":"Luciano Igor Bittencourt de Assis","regional":"RIO","estado":"RJ","pontos":314363},{"rank":46,"nome":"Alexsander de Aguiar Oliveira","regional":"RIO","estado":"RJ","pontos":312998},{"rank":47,"nome":"Eniraldo de Jesus Alves","regional":"RIO","estado":"BA","pontos":312687},{"rank":48,"nome":"ALEX DA SILVA OLIVEIRA","regional":"CTO","estado":"MG","pontos":312464},{"rank":49,"nome":"Israel Ferreira Machado","regional":"NNE","estado":"CE","pontos":311853},{"rank":50,"nome":"Wellington de Jesus Nascimento Santos","regional":"SPC","estado":"SP","pontos":311179}],"campanhas":[{"campanha":"CAMPANHA DUNHILL_DEZEMBRO_2025","pontos":2930000,"participantes":433,"transacoes":462,"area":"Incentivos","status":"ATIVO","verba":1000000.0,"atribuido":287850.0},{"campanha":"DUNHILL WONDERLUST JULHO 2024","pontos":2530000,"participantes":501,"transacoes":513,"area":"Brands - Dunhill","status":"ATIVO","verba":9000.0,"atribuido":252600.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS AGOSTO 2025","pontos":2291850,"participantes":518,"transacoes":518,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":228585.0},{"campanha":"CAMPANHA PARCERIA P&G MARÇO DE 2023","pontos":2170000,"participantes":371,"transacoes":373,"area":"Parceria","status":"ATIVO","verba":156500.0,"atribuido":216500.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO 2025","pontos":2150540,"participantes":509,"transacoes":509,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":214529.0},{"campanha":"RANKING H2 2023 - TOP VENDEDORES","pontos":2075000,"participantes":56,"transacoes":57,"area":"Incentivos","status":"ATIVO","verba":206000.0,"atribuido":207500.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS SETEMBRO 2025","pontos":2027940,"participantes":540,"transacoes":540,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":202509.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS MAIO 2025","pontos":1988260,"participantes":479,"transacoes":482,"area":"Parceria","status":"ATIVO","verba":200000.0,"atribuido":194893.0},{"campanha":"LUCKY STRIKE COMPACT SPC, SPR E SUL NOVEMBRO 2024","pontos":1921000,"participantes":356,"transacoes":449,"area":"Brands - Lucky Strike","status":"ATIVO","verba":751000.0,"atribuido":137300.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JUNHO 2025","pontos":1910960,"participantes":454,"transacoes":457,"area":"Parceria","status":"ATIVO","verba":2000000.0,"atribuido":189809.0},{"campanha":"VOLUME OU TRAVESSURAS OUTUBRO 2024","pontos":1882000,"participantes":578,"transacoes":648,"area":"Incentivos","status":"ATIVO","verba":148000.0,"atribuido":134800.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS DEZEMBRO 2025","pontos":1813740,"participantes":529,"transacoes":529,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":180974.0},{"campanha":"BIC DECOR MAIO 2024","pontos":1801000,"participantes":386,"transacoes":386,"area":"Parceria","status":"ATIVO","verba":177770.0,"atribuido":177770.0},{"campanha":"ROTHMANS B2E NOVEMBRO 2022","pontos":1792000,"participantes":431,"transacoes":436,"area":"Incentivos","status":"ATIVO","verba":160400.0,"atribuido":180200.0},{"campanha":"INADIMPLÊNCIA NOVEMBRO 2023","pontos":1783000,"participantes":347,"transacoes":350,"area":"Incentivos","status":"ATIVO","verba":180000.0,"atribuido":178850.0},{"campanha":"LUCKY STRIKE XL SPC, SPR E CTO MAIO 2025","pontos":1759000,"participantes":253,"transacoes":255,"area":"Brands - Lucky Strike","status":"ATIVO","verba":172100.0,"atribuido":175900.0},{"campanha":"CAMPANHA PLANO DE VOO DEZEMBRO 2023","pontos":1702000,"participantes":306,"transacoes":307,"area":"Incentivos","status":"ATIVO","verba":169000.0,"atribuido":170200.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS_OUTUBRO_2025","pontos":1648710,"participantes":518,"transacoes":519,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":164629.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO 2025","pontos":1574820,"participantes":483,"transacoes":484,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":157222.0},{"campanha":"MARATONA PRIME AGOSTO 2024","pontos":1562260,"participantes":539,"transacoes":540,"area":"Prime","status":"ATIVO","verba":155420.0,"atribuido":155420.0},{"campanha":"ROTHMANS B2E DEZEMBRO 2022","pontos":1520000,"participantes":404,"transacoes":407,"area":"Incentivos","status":"ATIVO","verba":132800.0,"atribuido":153200.0},{"campanha":"ESTRELAS TURBINADAS ABRIL 2025","pontos":1513680,"participantes":372,"transacoes":372,"area":"Parceria","status":"ATIVO","verba":149988.0,"atribuido":150162.0},{"campanha":"INADIMPLÊNCIA 2022","pontos":1469500,"participantes":273,"transacoes":288,"area":"Incentivos","status":"ATIVO","verba":142100.0,"atribuido":152050.0},{"campanha":"CAMPANHA PARCERIA P&G MAIO 2023","pontos":1463000,"participantes":447,"transacoes":484,"area":"Parceria","status":"ATIVO","verba":1485000.0,"atribuido":146600.0},{"campanha":"ESTRELAS TURBINADAS MARÇO 2025","pontos":1441080,"participantes":399,"transacoes":399,"area":"Parceria","status":"ATIVO","verba":128721.0,"atribuido":143427.0},{"campanha":"CAMPANHA DUNHILL_NOVEMBRO_2025","pontos":1401500,"participantes":227,"transacoes":228,"area":"Brands - Dunhill","status":"ATIVO","verba":100000.0,"atribuido":139550.0},{"campanha":"LUCKY STRIKE F&S XL SPC, SPR E CTO - JUNHO'25","pontos":1335000,"participantes":254,"transacoes":261,"area":"Brands - Lucky Strike","status":"ATIVO","verba":1000000.0,"atribuido":132900.0},{"campanha":"P&G FEVEREIRO 2024","pontos":1301000,"participantes":211,"transacoes":392,"area":"Parceria","status":"ATIVO","verba":57600.0,"atribuido":129500.0},{"campanha":"CAMPANHA P&G JUNHO 2023","pontos":1265425,"participantes":414,"transacoes":418,"area":"Parceria","status":"ATIVO","verba":123865.0,"atribuido":126843.0},{"campanha":"PARCERIA VENDA TURBINADA OUTUBRO 2024","pontos":1229100,"participantes":276,"transacoes":280,"area":"Parceria","status":"ATIVO","verba":122320.0,"atribuido":122050.0},{"campanha":"CAMPANHA DUNHILL_OUTUBRO_2025","pontos":1167000,"participantes":169,"transacoes":175,"area":"Brands - Dunhill","status":"ATIVO","verba":1000000.0,"atribuido":115100.0},{"campanha":"DUNHILL ON ICE TROPIC JANEIRO 2024","pontos":1120000,"participantes":508,"transacoes":562,"area":"Brands - Dunhill","status":"ATIVO","verba":200000.0,"atribuido":112200.0},{"campanha":"MARATONA PRIME JULHO 2024","pontos":1048150,"participantes":379,"transacoes":381,"area":"Prime","status":"ATIVO","verba":104554.0,"atribuido":104277.0},{"campanha":"MISSÃO PRIME NOVEMBRO 2023","pontos":1043920,"participantes":481,"transacoes":482,"area":"Prime","status":"ATIVO","verba":1044170.0,"atribuido":104677.0},{"campanha":"CAMPANHAS PARCERIA MARÇO 2026","pontos":970000,"participantes":242,"transacoes":243,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":91100.0},{"campanha":"+MU MARÇO 2024","pontos":966525,"participantes":139,"transacoes":159,"area":"Parceria","status":"ATIVO","verba":93000.0,"atribuido":92195.0},{"campanha":"CAMPANHA PARCERIA_ABRIL 2026","pontos":963000,"participantes":238,"transacoes":238,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":96300.0},{"campanha":"ROTHMANS B2E OUTUBRO 2022","pontos":958000,"participantes":327,"transacoes":327,"area":"Incentivos","status":"ATIVO","verba":141800.0,"atribuido":96800.0},{"campanha":"P&G FEVEREIRO 2023","pontos":949000,"participantes":320,"transacoes":321,"area":"Parceria","status":"ATIVO","verba":91500.0,"atribuido":94900.0},{"campanha":"FINI, RAYOVAC E EVERLAST ABRIL 2024","pontos":948480,"participantes":458,"transacoes":462,"area":"Parceria","status":"ATIVO","verba":94188.0,"atribuido":93900.0},{"campanha":"RANKING H2 2024 - COMPILADO","pontos":945000,"participantes":146,"transacoes":147,"area":"Incentivos","status":"ATIVO","verba":95500.0,"atribuido":94500.0},{"campanha":"LUCKY STRIKE ULP OUTUBRO 2023","pontos":945000,"participantes":251,"transacoes":370,"area":"Brands - Lucky Strike","status":"ATIVO","verba":45000.0,"atribuido":94500.0},{"campanha":"MISSÃO PRIME AGOSTO 2023","pontos":921750,"participantes":431,"transacoes":450,"area":"Prime","status":"ATIVO","verba":913390.0,"atribuido":92270.0},{"campanha":"DUNHILL ON ICE TROPIC FEVEREIRO 2024","pontos":920000,"participantes":421,"transacoes":469,"area":"Brands - Dunhill","status":"ATIVO","verba":82000.0,"atribuido":92200.0},{"campanha":"MISSÃO PRIME DEZEMBRO 2023","pontos":918140,"participantes":425,"transacoes":425,"area":"Prime","status":"ATIVO","verba":9181400.0,"atribuido":91814.0},{"campanha":"MISSÃO PRIME OUTUBRO 2023","pontos":907050,"participantes":435,"transacoes":435,"area":"Prime","status":"ATIVO","verba":907050.0,"atribuido":90705.0},{"campanha":"LANÇAMENTO DUNHILL OUTUBRO 25","pontos":894000,"participantes":876,"transacoes":890,"area":"Brands - Dunhill","status":"ATIVO","verba":1000000.0,"atribuido":89200.0},{"campanha":"P&G ABRIL 2024","pontos":888000,"participantes":263,"transacoes":273,"area":"Parceria","status":"ATIVO","verba":82700.0,"atribuido":86400.0},{"campanha":"ESTRELAS TURBINADAS FEVEREIRO 2025","pontos":887400,"participantes":253,"transacoes":253,"area":"Parceria","status":"ATIVO","verba":89274.0,"atribuido":88740.0},{"campanha":"P&G DEZEMBRO 2023","pontos":880000,"participantes":263,"transacoes":265,"area":"Parceria","status":"ATIVO","verba":866000.0,"atribuido":88000.0},{"campanha":"P&G JULHO 2024","pontos":877000,"participantes":283,"transacoes":283,"area":"Parceria","status":"ATIVO","verba":86000.0,"atribuido":86700.0},{"campanha":"PARCERIA VENDA TURBINADA DEZEMBRO 2024","pontos":857200,"participantes":243,"transacoes":248,"area":"Parceria","status":"ATIVO","verba":85170.0,"atribuido":85420.0},{"campanha":"P&G AGOSTO 2023","pontos":842450,"participantes":254,"transacoes":255,"area":"Parceria","status":"ATIVO","verba":697800.0,"atribuido":84245.0},{"campanha":"DUNHILL WONDERLUST BRASIL (-SPC) JUNHO 2024","pontos":831000,"participantes":282,"transacoes":286,"area":"Brands - Dunhill","status":"ATIVO","verba":8300.0,"atribuido":82900.0},{"campanha":"P&G MARÇO 2024","pontos":823000,"participantes":238,"transacoes":240,"area":"Parceria","status":"ATIVO","verba":80500.0,"atribuido":82000.0},{"campanha":"P&G MAIO 2024","pontos":821000,"participantes":251,"transacoes":253,"area":"Parceria","status":"ATIVO","verba":81500.0,"atribuido":81500.0},{"campanha":"TREVO DE OURO MARÇO 2025","pontos":812000,"participantes":392,"transacoes":392,"area":"Parceria","status":"ATIVO","verba":74200.0,"atribuido":80950.0},{"campanha":"RAYOVAC JULHO/AGOSTO 2023 ","pontos":764000,"participantes":381,"transacoes":388,"area":"Parceria","status":"ATIVO","verba":628000.0,"atribuido":76400.0},{"campanha":"LUCKY STRIKE COMPACT SPC, SPR E SUL DEZEMBRO 2024","pontos":757000,"participantes":140,"transacoes":278,"area":"Brands - Lucky Strike","status":"ATIVO","verba":6800.0,"atribuido":68900.0},{"campanha":"RANKING H1 2024 - TOP VENDEDORES","pontos":740000,"participantes":162,"transacoes":165,"area":"Incentivos","status":"ATIVO","verba":72000.0,"atribuido":74000.0},{"campanha":"LUCKY STRIKE ICE JULHO 2023","pontos":738000,"participantes":360,"transacoes":369,"area":"Brands - Lucky Strike","status":"ATIVO","verba":208000.0,"atribuido":74200.0},{"campanha":"MISSÃO PRIME SETEMBRO 2023","pontos":737070,"participantes":368,"transacoes":370,"area":"Prime","status":"ATIVO","verba":793720.0,"atribuido":73972.0},{"campanha":"EVERLAST DEZEMBRO 2022","pontos":709000,"participantes":365,"transacoes":365,"area":"Parceria","status":"ATIVO","verba":71000.0,"atribuido":71000.0},{"campanha":"COPA PRIME NOVEMBRO DE 2022","pontos":704750,"participantes":248,"transacoes":353,"area":"Prime","status":"ATIVO","verba":64725.0,"atribuido":70775.0},{"campanha":"P&G NOVEMBRO 2023","pontos":704000,"participantes":193,"transacoes":196,"area":"Parceria","status":"ATIVO","verba":62800.0,"atribuido":70400.0},{"campanha":"RANKING H1 2023 - TOP VENDEDORES","pontos":690000,"participantes":62,"transacoes":62,"area":"Incentivos","status":"ATIVO","verba":690000.0,"atribuido":69000.0},{"campanha":"ESTRELAS TURBINADAS JANEIRO 2025","pontos":682890,"participantes":185,"transacoes":185,"area":"Parceria","status":"ATIVO","verba":67629.0,"atribuido":67629.0},{"campanha":"P&G JUNHO 2024","pontos":655000,"participantes":214,"transacoes":216,"area":"Parceria","status":"ATIVO","verba":64600.0,"atribuido":64900.0},{"campanha":"ROTHMANS REALEZA SPR, RIO E SUL SETEMBRO 2024","pontos":641960,"participantes":288,"transacoes":324,"area":"Brands - Rothmans","status":"ATIVO","verba":61831.0,"atribuido":63181.0},{"campanha":"+MU VIAGEM MARÇO 2024","pontos":640000,"participantes":31,"transacoes":33,"area":"Parceria","status":"ATIVO","verba":58000.0,"atribuido":58000.0},{"campanha":"ROTHMANS REALEZA NNE E CTO OUTUBRO 2024","pontos":617500,"participantes":195,"transacoes":271,"area":"Brands - Rothmans","status":"ATIVO","verba":30000.0,"atribuido":61750.0},{"campanha":"P&G SETEMBRO 2023","pontos":597000,"participantes":259,"transacoes":259,"area":"Parceria","status":"ATIVO","verba":595000.0,"atribuido":59700.0},{"campanha":"PARCERIA VENDA TURBINADA NOVEMBRO 2024","pontos":564800,"participantes":162,"transacoes":162,"area":"Parceria","status":"ATIVO","verba":55730.0,"atribuido":56130.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO - BOOST P&G 2025","pontos":542300,"participantes":474,"transacoes":475,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":54130.0},{"campanha":"CAMPANHA PLANO DE VOO NOVEMBRO 2023","pontos":542000,"participantes":219,"transacoes":221,"area":"Incentivos","status":"ATIVO","verba":54200.0,"atribuido":54200.0},{"campanha":"LUCKY STRIKE FRESH WILD OUTUBRO 2023","pontos":536250,"participantes":215,"transacoes":217,"area":"Brands - Lucky Strike","status":"ATIVO","verba":2500.0,"atribuido":53500.0},{"campanha":"CAMPANHA PARCERIA BOOST W1&W2 FEVEREIRO DE 2023","pontos":525500,"participantes":275,"transacoes":275,"area":"Parceria","status":"ATIVO","verba":50350.0,"atribuido":52550.0},{"campanha":"RETAIL AUDIT - CX BRASIL ABRIL 2025","pontos":525500,"participantes":307,"transacoes":308,"area":"CX BRASIL","status":"ATIVO","verba":51350.0,"atribuido":52550.0},{"campanha":"FINI OUTUBRO 2023","pontos":525000,"participantes":256,"transacoes":263,"area":"Parceria","status":"ATIVO","verba":520000.0,"atribuido":52500.0},{"campanha":"P&G NOVEMBRO 2022","pontos":519500,"participantes":176,"transacoes":176,"area":"Parceria","status":"ATIVO","verba":51700.0,"atribuido":51950.0},{"campanha":"EVERLAST JANEIRO 2023","pontos":497000,"participantes":243,"transacoes":244,"area":"Parceria","status":"ATIVO","verba":48800.0,"atribuido":50100.0},{"campanha":"FINI DEZEMBRO 2023","pontos":476000,"participantes":236,"transacoes":238,"area":"Parceria","status":"ATIVO","verba":47000.0,"atribuido":47600.0},{"campanha":"PRIME SUL SETEMBRO 2024","pontos":473810,"participantes":149,"transacoes":155,"area":"Prime","status":"ATIVO","verba":47381.0,"atribuido":47381.0},{"campanha":"P&G SETEMBRO 2024","pontos":472000,"participantes":160,"transacoes":160,"area":"Parceria","status":"ATIVO","verba":46600.0,"atribuido":47200.0},{"campanha":"CAMPANHA IC - DIGITAL CHAMPIONS AGOSTO 2024","pontos":472000,"participantes":159,"transacoes":159,"area":"IC - DIGITAL","status":"ATIVO","verba":47750.0,"atribuido":47200.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST P&G  MAIO 2025","pontos":469370,"participantes":470,"transacoes":471,"area":"Parceria","status":"ATIVO","verba":459090.0,"atribuido":45893.0},{"campanha":"LUCKY STRIKE COMPACT SPC, SPR E SUL JANEIRO 2025","pontos":459000,"participantes":97,"transacoes":123,"area":"Brands - Lucky Strike","status":"ATIVO","verba":23900.0,"atribuido":45900.0},{"campanha":"BIC SHAVER JULHO 2023","pontos":441150,"participantes":460,"transacoes":506,"area":"Parceria","status":"ATIVO","verba":343750.0,"atribuido":44115.0},{"campanha":"BAT STARS MARÇO 2025","pontos":439500,"participantes":228,"transacoes":231,"area":"KA CNV","status":"ATIVO","verba":35540.0,"atribuido":43950.0},{"campanha":"CAMPANHA IC - DIGITAL CHAMPIONS JULHO 2024","pontos":433500,"participantes":288,"transacoes":289,"area":"IC - DIGITAL","status":"ATIVO","verba":43350.0,"atribuido":43200.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO - BOOST P&G","pontos":433170,"participantes":499,"transacoes":499,"area":"Parceria","status":"ATIVO","verba":2000000.0,"atribuido":43317.0},{"campanha":"BIC SHAVER FEVEREIRO 2024","pontos":430350,"participantes":385,"transacoes":392,"area":"Parceria","status":"ATIVO","verba":33555.0,"atribuido":42505.0},{"campanha":"JULHO SPR 2023","pontos":426010,"participantes":79,"transacoes":79,"area":"BU SPR","status":"ATIVO","verba":413600.0,"atribuido":42601.0},{"campanha":"ACELERA SHARE CTO OUTUBRO 2024","pontos":419000,"participantes":93,"transacoes":93,"area":"BU CTO","status":"ATIVO","verba":41900.0,"atribuido":41900.0},{"campanha":"COPA PRIME REGIONAL NNE NOVEMBRO DE 2022","pontos":416400,"participantes":128,"transacoes":128,"area":"Prime","status":"ATIVO","verba":409350.0,"atribuido":41740.0},{"campanha":"BIC SHAVER AGOSTO 2023","pontos":414300,"participantes":484,"transacoes":494,"area":"Parceria","status":"ATIVO","verba":382050.0,"atribuido":41435.0},{"campanha":"BAT STARS JANEIRO 2025","pontos":407400,"participantes":201,"transacoes":212,"area":"KA CNV","status":"ATIVO","verba":34320.0,"atribuido":40740.0},{"campanha":"ROTHMANS REALEZA RIO E SUL OUTUBRO 2024","pontos":395500,"participantes":115,"transacoes":116,"area":"Brands - Rothmans","status":"ATIVO","verba":38850.0,"atribuido":39150.0},{"campanha":"BAT MASTER JULHO 2025","pontos":395000,"participantes":78,"transacoes":82,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":39500.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST +MU SETEMBRO 2025","pontos":387350,"participantes":525,"transacoes":525,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":38675.0},{"campanha":"TREVO DE OURO AGOSTO 2025","pontos":381500,"participantes":200,"transacoes":203,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":38150.0},{"campanha":"FINI NOVEMBRO 2023","pontos":379000,"participantes":188,"transacoes":191,"area":"Parceria","status":"ATIVO","verba":314000.0,"atribuido":37900.0},{"campanha":"+MU ABRIL 2024","pontos":373780,"participantes":107,"transacoes":110,"area":"Parceria","status":"ATIVO","verba":36878.0,"atribuido":37378.0},{"campanha":"DUNHILL ON ICE TROPIC MARÇO 2024","pontos":371000,"participantes":161,"transacoes":193,"area":"Brands - Dunhill","status":"ATIVO","verba":26200.0,"atribuido":37100.0},{"campanha":"BIC DECOR FEVEREIRO 2024","pontos":348750,"participantes":330,"transacoes":341,"area":"Parceria","status":"ATIVO","verba":16040.0,"atribuido":34875.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST +MU DEZEMBRO 2025","pontos":331600,"participantes":505,"transacoes":505,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":33130.0},{"campanha":"CAMPANHA SHARE EU VOU BU CTO JUNHO 2025","pontos":331000,"participantes":87,"transacoes":97,"area":"BU CTO","status":"ATIVO","verba":1000000.0,"atribuido":32600.0},{"campanha":"CAMPANHA LIGA DAS ESTRELAS 2025","pontos":316500,"participantes":50,"transacoes":50,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":31650.0},{"campanha":"+MU FEVEREIRO 2024","pontos":315450,"participantes":106,"transacoes":107,"area":"Parceria","status":"ATIVO","verba":16475.0,"atribuido":31425.0},{"campanha":"BAT STARS JUNHO 2025","pontos":310000,"participantes":62,"transacoes":62,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":31000.0},{"campanha":"BIC DECOR JUNHO 2024","pontos":308900,"participantes":391,"transacoes":393,"area":"Parceria","status":"ATIVO","verba":30830.0,"atribuido":30860.0},{"campanha":"CAMPANHA BIC SHAVER JUNHO 2023","pontos":297425,"participantes":417,"transacoes":417,"area":"Parceria","status":"ATIVO","verba":297125.0,"atribuido":29762.5},{"campanha":"CAMPANHA ESTRELAS TURBINADAS - BOOST BIC SHAVER - DEZEMBRO 2025","pontos":295940,"participantes":475,"transacoes":638,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":14600.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS - BOOST BIC SHAVER - DEZEMBRO 2025","pontos":295940,"participantes":475,"transacoes":638,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":14979.0},{"campanha":"BAT STARS FEVEREIRO 2025","pontos":292100,"participantes":154,"transacoes":154,"area":"KA CNV","status":"ATIVO","verba":16680.0,"atribuido":29210.0},{"campanha":"FOCOS RIO DEZEMBRO 2024","pontos":291000,"participantes":98,"transacoes":183,"area":"BU RIO","status":"ATIVO","verba":21300.0,"atribuido":28700.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BIC SHAVER_OUTUBRO_2025","pontos":285700,"participantes":506,"transacoes":743,"area":"Parceria","status":"ATIVO","verba":150000.0,"atribuido":28290.0},{"campanha":"FINI MARÇO 2024","pontos":283500,"participantes":63,"transacoes":63,"area":"Parceria","status":"ATIVO","verba":27900.0,"atribuido":27900.0},{"campanha":"RAYOVAC FEVEREIRO DE 2023","pontos":280000,"participantes":140,"transacoes":140,"area":"Parceria","status":"ATIVO","verba":26800.0,"atribuido":28000.0},{"campanha":"CAMPANHA INADIMPLÊNCIA PRIME $5 SUL FEVEREIRO DE 2023","pontos":277950,"participantes":137,"transacoes":153,"area":"BU SUL","status":"ATIVO","verba":19285.0,"atribuido":28020.0},{"campanha":"NATAL CTO DEZEMBRO 2024","pontos":277000,"participantes":128,"transacoes":128,"area":"BU CTO","status":"ATIVO","verba":31200.0,"atribuido":27700.0},{"campanha":"CAMPANHA BAT MASTER DEZEMBRO 2025","pontos":276000,"participantes":69,"transacoes":69,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":27600.0},{"campanha":"BIC DECOR JANEIRO 2024","pontos":273950,"participantes":331,"transacoes":333,"area":"Parceria","status":"ATIVO","verba":27470.0,"atribuido":27440.0},{"campanha":"CAMPANHA SHARE EU VOU BU CTO AGOSTO 2025","pontos":272000,"participantes":58,"transacoes":59,"area":"BU CTO","status":"ATIVO","verba":1000000.0,"atribuido":27200.0},{"campanha":"CAMPANHA SHARE EU VOU BU CTO JULHO 2025","pontos":269000,"participantes":59,"transacoes":59,"area":"BU CTO","status":"ATIVO","verba":100000.0,"atribuido":26900.0},{"campanha":"BIC SHAVER MAIO 2024","pontos":268460,"participantes":357,"transacoes":359,"area":"Parceria","status":"ATIVO","verba":26601.0,"atribuido":26601.0},{"campanha":"CAMPANHA SHARE EU VOU BU CTO JUNHO 2024","pontos":268000,"participantes":73,"transacoes":73,"area":"BU CTO","status":"ATIVO","verba":26500.0,"atribuido":26500.0},{"campanha":"BIC DECOR & EZ REACH MARÇO 2024","pontos":258375,"participantes":334,"transacoes":335,"area":"Parceria","status":"ATIVO","verba":25000.0,"atribuido":24147.5},{"campanha":"BIC SHAVER ABRIL 2024","pontos":255050,"participantes":340,"transacoes":343,"area":"Parceria","status":"ATIVO","verba":24925.0,"atribuido":24915.0},{"campanha":"LUCKY STRIKE WILD MARÇO 2024","pontos":253646,"participantes":78,"transacoes":80,"area":"Brands - Lucky Strike","status":"ATIVO","verba":30000.0,"atribuido":25364.6},{"campanha":"BIC SHAVER DEZEMBRO 2023","pontos":253500,"participantes":364,"transacoes":367,"area":"Parceria","status":"ATIVO","verba":251150.0,"atribuido":25350.0},{"campanha":"ACELERA SHARE CTO SETEMBRO 2024","pontos":248000,"participantes":55,"transacoes":55,"area":"BU CTO","status":"ATIVO","verba":24400.0,"atribuido":24400.0},{"campanha":"BIC SHAVER MARÇO 2024","pontos":247425,"participantes":338,"transacoes":338,"area":"Parceria","status":"ATIVO","verba":24000.0,"atribuido":24497.5},{"campanha":"BAT MASTER_NOVEMBRO_2025","pontos":244000,"participantes":61,"transacoes":61,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":24000.0},{"campanha":"BIC SHAVER NOVEMBRO 2023","pontos":242250,"participantes":318,"transacoes":319,"area":"Parceria","status":"ATIVO","verba":235900.0,"atribuido":24225.0},{"campanha":"ACELERA SHARE CTO JULHO 2024","pontos":241000,"participantes":55,"transacoes":55,"area":"BU CTO","status":"ATIVO","verba":23600.0,"atribuido":23600.0},{"campanha":"RANKING MENSAL AGOSTO E SETEMBRO 2023","pontos":240000,"participantes":88,"transacoes":120,"area":"Incentivos","status":"ATIVO","verba":24000.0,"atribuido":24000.0},{"campanha":"BAT MASTER_OUTUBRO_2025","pontos":240000,"participantes":59,"transacoes":60,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":21600.0},{"campanha":"CAMPANHA PARCERIA BIC SHAVER MAIO 2023","pontos":235450,"participantes":391,"transacoes":431,"area":"Parceria","status":"ATIVO","verba":234300.0,"atribuido":23610.0},{"campanha":"BIC SHAVER JANEIRO 2024","pontos":230150,"participantes":364,"transacoes":365,"area":"Parceria","status":"ATIVO","verba":23120.0,"atribuido":23115.0},{"campanha":"BIC DECOR & EZ REACH ABRIL 2024","pontos":229850,"participantes":341,"transacoes":350,"area":"Parceria","status":"ATIVO","verba":22515.0,"atribuido":22925.0},{"campanha":"EU VOU - BATEU LEVOU BU CTO MAIO 2024","pontos":227000,"participantes":60,"transacoes":60,"area":"BU CTO","status":"ATIVO","verba":22300.0,"atribuido":22700.0},{"campanha":"CAMPANHA NIVEL TURBO JULHO 2025","pontos":224725,"participantes":63,"transacoes":63,"area":"BU NNE","status":"ATIVO","verba":100000.0,"atribuido":22472.5},{"campanha":"PARCERIA VENDA TURBINADA BOOST DEZEMBRO 2024","pontos":220500,"participantes":147,"transacoes":147,"area":"Parceria","status":"ATIVO","verba":22050.0,"atribuido":22050.0},{"campanha":"+MU DEZEMBRO 2024","pontos":219990,"participantes":339,"transacoes":346,"area":"Parceria","status":"ATIVO","verba":21960.0,"atribuido":21957.0},{"campanha":"LUCKY STRIKE F&S XL - JULHO'25","pontos":218000,"participantes":64,"transacoes":64,"area":"Brands - Lucky Strike","status":"ATIVO","verba":2000000.0,"atribuido":21400.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS AGOSTO - BOOST +MU","pontos":215190,"participantes":495,"transacoes":495,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":21468.0},{"campanha":"LUCKY STRIKE ULP MARÇO 2024 ","pontos":215000,"participantes":58,"transacoes":59,"area":"Brands - Lucky Strike","status":"ATIVO","verba":5000.0,"atribuido":21500.0},{"campanha":"CAMPANHA MASTER CHALLENGE DEZEMBRO 2025","pontos":215000,"participantes":15,"transacoes":15,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":21500.0},{"campanha":"+MU JULHO 2024","pontos":209500,"participantes":85,"transacoes":88,"area":"Parceria","status":"ATIVO","verba":18700.0,"atribuido":20200.0},{"campanha":"COPA PRIME REGIONAL RIO OUTUBRO DE 2022","pontos":206550,"participantes":50,"transacoes":50,"area":"Prime","status":"ATIVO","verba":20855.0,"atribuido":20855.0},{"campanha":"CRICKET JULHO 2024","pontos":205883,"participantes":149,"transacoes":150,"area":"Parceria","status":"ATIVO","verba":19620.0,"atribuido":20588.3},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST RAYOVAC_OUTUBRO_2025 ","pontos":202850,"participantes":461,"transacoes":462,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":20280.0},{"campanha":"CAMPANHA $5 POR BOLETO PAGO BU RIO FEVEREIRO DE 2023","pontos":197910,"participantes":83,"transacoes":84,"area":"BU RIO","status":"ATIVO","verba":19816.0,"atribuido":19791.0},{"campanha":"BIC SHAVER NOVEMBRO 2022","pontos":196550,"participantes":134,"transacoes":134,"area":"Parceria","status":"ATIVO","verba":19655.0,"atribuido":19655.0},{"campanha":"FOCOS W1W2W3 BU RIO JUNHO 2024","pontos":196500,"participantes":76,"transacoes":76,"area":"BU RIO","status":"ATIVO","verba":19650.0,"atribuido":19650.0},{"campanha":"CRICKET SETEMBRO 2024","pontos":195600,"participantes":130,"transacoes":130,"area":"Parceria","status":"ATIVO","verba":19670.0,"atribuido":19560.0},{"campanha":"CAMPANHA PARCERIA BIC SHAVER MARÇO DE 2023","pontos":195550,"participantes":396,"transacoes":410,"area":"Parceria","status":"ATIVO","verba":9225.0,"atribuido":18340.0},{"campanha":"ESTRELAS TURBINADAS +BOOST BIC SHAVER MARÇO 2025","pontos":193600,"participantes":331,"transacoes":331,"area":"Parceria","status":"ATIVO","verba":18530.0,"atribuido":19315.0},{"campanha":"ESTRELAS TURBINADAS +BOOST MU MARÇO 2025","pontos":193020,"participantes":386,"transacoes":386,"area":"Parceria","status":"ATIVO","verba":17259.0,"atribuido":19116.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO - BOOST FINI 2025","pontos":186470,"participantes":443,"transacoes":444,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":18603.0},{"campanha":"ROTHMANS REALEZA SPC SETEMBRO 2024","pontos":180770,"participantes":71,"transacoes":71,"area":"Brands - Rothmans","status":"ATIVO","verba":18077.0,"atribuido":18077.0},{"campanha":"CAMPANHA BAT MASTER JANEIRO 2026","pontos":180000,"participantes":45,"transacoes":45,"area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":18000.0},{"campanha":"LUCKY STRIKE WILD NNE AGOSTO 2023","pontos":180000,"participantes":72,"transacoes":72,"area":"Brands - Lucky Strike","status":"ATIVO","verba":172500.0,"atribuido":18000.0},{"campanha":"CAMPANHA $5 POR BOLETO PAGO BU RIO MARÇO DE 2023","pontos":179250,"participantes":84,"transacoes":87,"area":"BU RIO","status":"ATIVO","verba":18137.0,"atribuido":17925.0},{"campanha":"BIC SHAVER OUTUBRO 2023","pontos":178100,"participantes":272,"transacoes":280,"area":"Parceria","status":"ATIVO","verba":176950.0,"atribuido":17810.0},{"campanha":"FINI JULHO 2024","pontos":175000,"participantes":176,"transacoes":176,"area":"Parceria","status":"ATIVO","verba":17200.0,"atribuido":17500.0},{"campanha":"BIC SHAVER JUNHO 2024","pontos":174150,"participantes":384,"transacoes":388,"area":"Parceria","status":"ATIVO","verba":17310.0,"atribuido":17325.0},{"campanha":"PARCERIA BIC SHAVER ABRIL 2023","pontos":173950,"participantes":351,"transacoes":356,"area":"Parceria","status":"ATIVO","verba":71800.0,"atribuido":17410.0},{"campanha":"LUCKY STRIKE FRESH WILD RV RIO JANEIRO 2024","pontos":173656,"participantes":52,"transacoes":53,"area":"Brands - Lucky Strike","status":"ATIVO","verba":17366.0,"atribuido":17365.6},{"campanha":"LUCKY STRIKE FRESH WILD RV CTO JANEIRO 2024","pontos":172020,"participantes":57,"transacoes":59,"area":"Brands - Lucky Strike","status":"ATIVO","verba":18000.0,"atribuido":17740.0},{"campanha":"RANKING MENSAL JULHO 2025","pontos":165300,"participantes":76,"transacoes":76,"area":"Incentivos","status":"ATIVO","verba":1000000.0,"atribuido":16530.0},{"campanha":"FINI AGOSTO 2024","pontos":164000,"participantes":164,"transacoes":164,"area":"Parceria","status":"ATIVO","verba":16300.0,"atribuido":16300.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST +MU  MAIO 2025","pontos":163350,"participantes":447,"transacoes":448,"area":"Parceria","status":"ATIVO","verba":16086.0,"atribuido":16134.0},{"campanha":"RANKING MENSAL JUNHO 2025","pontos":163300,"participantes":65,"transacoes":75,"area":"Incentivos","status":"ATIVO","verba":500000.0,"atribuido":16330.0},{"campanha":"ESTRELAS TURBINADAS +BOOST FINI ABRIL 2025","pontos":163110,"participantes":357,"transacoes":357,"area":"Parceria","status":"ATIVO","verba":16131.0,"atribuido":16149.0},{"campanha":"ULP FEVEREIRO 2023 NNE","pontos":162000,"participantes":108,"transacoes":108,"area":"BU NNE","status":"ATIVO","verba":16200.0,"atribuido":16200.0},{"campanha":"RANKING SETEMBRO 2025","pontos":161300,"participantes":74,"transacoes":74,"area":"Incentivos","status":"ATIVO","verba":100000.0,"atribuido":16130.0},{"campanha":"RANKING NOVEMBRO 2025","pontos":161300,"participantes":74,"transacoes":74,"area":"Incentivos","status":"ATIVO","verba":100000.0,"atribuido":16130.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS - BOOST MAIS MU - JUNHO 2025","pontos":161160,"participantes":426,"transacoes":428,"area":"Parceria","status":"ATIVO","verba":170000.0,"atribuido":15942.0},{"campanha":"RANKING MENSAL AGOSTO 2025","pontos":160700,"participantes":74,"transacoes":74,"area":"Incentivos","status":"ATIVO","verba":1000000.0,"atribuido":16070.0},{"campanha":"FINI SETEMBRO 2024","pontos":159500,"participantes":135,"transacoes":135,"area":"Parceria","status":"ATIVO","verba":15950.0,"atribuido":15950.0},{"campanha":"RANKING OUTUBRO 2025","pontos":159300,"participantes":73,"transacoes":73,"area":"Incentivos","status":"ATIVO","verba":100000.0,"atribuido":15930.0},{"campanha":"FINI PASTILHA DEZEMBRO 2024","pontos":155370,"participantes":243,"transacoes":249,"area":"Parceria","status":"ATIVO","verba":15546.0,"atribuido":15505.5},{"campanha":"COPA BIC FINAL JULHO 2024","pontos":150000,"participantes":4,"transacoes":4,"area":"Parceria","status":"ATIVO","verba":15000.0,"atribuido":15000.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS - BOOST BIC SHAVER - SETEMBRO 2025","pontos":147050,"participantes":407,"transacoes":407,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":14705.0},{"campanha":"ESTRELAS TURBINADAS +BOOST MU FEVEREIRO 2025","pontos":146940,"participantes":249,"transacoes":249,"area":"Parceria","status":"ATIVO","verba":14742.0,"atribuido":14694.0},{"campanha":"+MU NOVEMBRO 2024","pontos":145480,"participantes":380,"transacoes":382,"area":"Parceria","status":"ATIVO","verba":14383.0,"atribuido":14380.0},{"campanha":"CAMPANHA INADIMPLÊNCIA PRIME BU SPC MARÇO DE 2023","pontos":145000,"participantes":29,"transacoes":29,"area":"Prime","status":"ATIVO","verba":14500.0,"atribuido":14500.0},{"campanha":"RECONHECIMENTO VOLUME HISTÓRICO MARÇO 2023","pontos":145000,"participantes":27,"transacoes":29,"area":"BU RIO","status":"ATIVO","verba":140000.0,"atribuido":15000.0},{"campanha":"EVERLAST JANEIRO 2024","pontos":144000,"participantes":361,"transacoes":363,"area":"Parceria","status":"ATIVO","verba":14575.0,"atribuido":14490.0},{"campanha":"RANKING H1 2025 - TOP VENDEDORES ","pontos":142000,"participantes":11,"transacoes":14,"area":"Incentivos","status":"ATIVO","verba":200000.0,"atribuido":12100.0},{"campanha":"FINI PASTILHA NOVEMBRO 2024","pontos":139875,"participantes":167,"transacoes":167,"area":"Parceria","status":"ATIVO","verba":13833.0,"atribuido":13965.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS AGOSTO - BOOST OCB","pontos":137190,"participantes":479,"transacoes":479,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":13659.0},{"campanha":"FOCOS RIO SETEMBRO 2024","pontos":137000,"participantes":57,"transacoes":117,"area":"BU RIO","status":"ATIVO","verba":13400.0,"atribuido":13700.0},{"campanha":"+MU OUTUBRO 2024","pontos":132500,"participantes":89,"transacoes":89,"area":"Parceria","status":"ATIVO","verba":13100.0,"atribuido":13100.0},{"campanha":"PRIME DAY - 31 DE MAIO DE 2023 BU RIO","pontos":129000,"participantes":62,"transacoes":64,"area":"BU RIO","status":"ATIVO","verba":122000.0,"atribuido":12900.0},{"campanha":"NOVO VISUAL CONECTA BAT - SPR E SUL JANEIRO 2025","pontos":128000,"participantes":128,"transacoes":128,"area":"IC - DIGITAL","status":"ATIVO","verba":13000.0,"atribuido":12800.0},{"campanha":"LUCKY STRIKE WILD FEVEREIRO 2024","pontos":127500,"participantes":55,"transacoes":55,"area":"Brands - Lucky Strike","status":"ATIVO","verba":14000.0,"atribuido":12548.0},{"campanha":"VOLUME MARÇO 2023 SPR","pontos":126000,"participantes":42,"transacoes":42,"area":"BU SPR","status":"ATIVO","verba":126000.0,"atribuido":12600.0},{"campanha":"CORRIDINHA RIO MAIO 2024","pontos":124210,"participantes":85,"transacoes":170,"area":"BU RIO","status":"ATIVO","verba":13000.0,"atribuido":12421.0},{"campanha":"PARCERIA RAYOVAC ABRIL 2023","pontos":124200,"participantes":62,"transacoes":63,"area":"Parceria","status":"ATIVO","verba":122000.0,"atribuido":12420.0},{"campanha":"RANKING MENSAL OUTUBRO 2023","pontos":122000,"participantes":61,"transacoes":61,"area":"Incentivos","status":"ATIVO","verba":120000.0,"atribuido":12200.0},{"campanha":"COPA BIC JULHO 2024","pontos":121000,"participantes":18,"transacoes":19,"area":"Parceria","status":"ATIVO","verba":10100.0,"atribuido":10900.0},{"campanha":"RANKING MENSAL NOVEMBRO 2023","pontos":120000,"participantes":60,"transacoes":60,"area":"Incentivos","status":"ATIVO","verba":120000.0,"atribuido":12000.0},{"campanha":"RANKING AGOSTO 2024","pontos":120000,"participantes":60,"transacoes":60,"area":"Incentivos","status":"ATIVO","verba":12000.0,"atribuido":12000.0},{"campanha":"RANKING MENSAL DEZEMBRO 2023","pontos":120000,"participantes":50,"transacoes":60,"area":"Incentivos","status":"ATIVO","verba":12000.0,"atribuido":12000.0},{"campanha":"CAMPANHA CONECTA GAME RH NOVEMBRO 2025","pontos":119500,"participantes":60,"transacoes":60,"area":"CX BRASIL","status":"ATIVO","verba":100000.0,"atribuido":11950.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO - BOOST RAYOVAC","pontos":119310,"participantes":452,"transacoes":452,"area":"Parceria","status":"ATIVO","verba":200000.0,"atribuido":11925.0},{"campanha":"AÇÃO B2E KA CNV MARÇO 2024","pontos":118000,"participantes":108,"transacoes":108,"area":"KA CNV","status":"ATIVO","verba":11800.0,"atribuido":11800.0},{"campanha":"KENT PRO BRAND CODE SUL MARÇO 2025","pontos":115960,"participantes":49,"transacoes":49,"area":"Brands - Kent","status":"ATIVO","verba":11596.0,"atribuido":11596.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS BOOST ENGOV_OUTUBRO_ 2025","pontos":114050,"participantes":233,"transacoes":233,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":11405.0},{"campanha":"FINI PASTILHA OUTUBRO 2024","pontos":108415,"participantes":261,"transacoes":262,"area":"Parceria","status":"ATIVO","verba":10852.5,"atribuido":10841.5},{"campanha":"DUNHILL WONDERLUST SPC MAIO 2024","pontos":106000,"participantes":33,"transacoes":40,"area":"Brands - Dunhill","status":"ATIVO","verba":10500.0,"atribuido":10600.0},{"campanha":"EVERLAST FEVEREIRO 2024","pontos":105950,"participantes":347,"transacoes":360,"area":"Parceria","status":"ATIVO","verba":904.0,"atribuido":10660.0},{"campanha":"COPA PRIME NOVEMBRO 2022 BU SUL","pontos":104750,"participantes":27,"transacoes":27,"area":"Prime","status":"ATIVO","verba":104750.0,"atribuido":10475.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO - BOOST ENGOV 2025","pontos":104300,"participantes":220,"transacoes":220,"area":"Parceria","status":"ATIVO","verba":110000.0,"atribuido":10430.0},{"campanha":"LUCKY STRIKE ULP RIO JULHO 2024 ","pontos":104000,"participantes":52,"transacoes":52,"area":"BU RIO","status":"ATIVO","verba":10100.0,"atribuido":10400.0},{"campanha":"ULP ABRIL 2023 NNE","pontos":103500,"participantes":69,"transacoes":69,"area":"BU NNE","status":"ATIVO","verba":103500.0,"atribuido":10350.0},{"campanha":"CAMPANHA LEPP REGIONAL SPC FEVEREIRO DE 2022","pontos":102000,"participantes":51,"transacoes":51,"area":"BU SPC","status":"ATIVO","verba":10200.0,"atribuido":10200.0},{"campanha":"KENT PRO BRAND JUNHO 2025","pontos":99950,"participantes":49,"transacoes":71,"area":"Brands - Kent","status":"ATIVO","verba":1000000.0,"atribuido":9995.0},{"campanha":"CAMPANHA ID LEPP SPC MARÇO DE 2023","pontos":96000,"participantes":48,"transacoes":48,"area":"BU SPC","status":"ATIVO","verba":9600.0,"atribuido":9600.0},{"campanha":"CRICKET AGOSTO 2024","pontos":94100,"participantes":106,"transacoes":106,"area":"Parceria","status":"ATIVO","verba":8710.0,"atribuido":8710.0},{"campanha":"KENT PRO BRAND CODE SUL FEVEREIRO 2025","pontos":93850,"participantes":43,"transacoes":43,"area":"Brands - Kent","status":"ATIVO","verba":7112.0,"atribuido":9385.0},{"campanha":"FOCOS W1 E W2 DEZEMBRO 2023 BU RIO","pontos":93800,"participantes":58,"transacoes":59,"area":"BU RIO","status":"ATIVO","verba":93300.0,"atribuido":9380.0},{"campanha":"POSITIVAÇÃO PARCERIA NNE DEZEMBRO 2023","pontos":91500,"participantes":53,"transacoes":53,"area":"BU NNE","status":"ATIVO","verba":815000.0,"atribuido":9150.0},{"campanha":"COPA PRIME REGIONAL RIO NOVEMBRO DE 2022","pontos":89300,"participantes":15,"transacoes":15,"area":"Prime","status":"ATIVO","verba":8430.0,"atribuido":8930.0},{"campanha":"+MU AGOSTO 2024","pontos":84500,"participantes":57,"transacoes":57,"area":"Parceria","status":"ATIVO","verba":8450.0,"atribuido":8450.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO - BOOST ENGOV","pontos":81290,"participantes":231,"transacoes":231,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":8033.0},{"campanha":"CAMPANHA BIC SHAVER - COORDENADOR_OUTUBRO_2025","pontos":80400,"participantes":9,"transacoes":9,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":8040.0},{"campanha":"+MU SETEMBRO 2024","pontos":80000,"participantes":54,"transacoes":54,"area":"Parceria","status":"ATIVO","verba":8000.0,"atribuido":8000.0},{"campanha":"+MU COORDENADOR FEVEREIRO 2025","pontos":80000,"participantes":8,"transacoes":16,"area":"Parceria","status":"ATIVO","verba":4000.0,"atribuido":4000.0},{"campanha":"P&G AGOSTO 2024","pontos":80000,"participantes":73,"transacoes":73,"area":"Parceria","status":"ATIVO","verba":7900.0,"atribuido":7900.0},{"campanha":"ESTRELAS TURBINADAS +BOOST CRICKET ABRIL 2025","pontos":78900,"participantes":156,"transacoes":156,"area":"Parceria","status":"ATIVO","verba":7767.0,"atribuido":7767.0},{"campanha":"CRICKET DEZEMBRO 2024","pontos":75300,"participantes":119,"transacoes":128,"area":"Parceria","status":"ATIVO","verba":7505.0,"atribuido":7515.0},{"campanha":"PRIME ADIMPLÊNCIA CTO FEVEREIRO 2024","pontos":73900,"participantes":90,"transacoes":90,"area":"BU CTO","status":"ATIVO","verba":7400.0,"atribuido":7390.0},{"campanha":"ARRAIA B2B BU RIO JUNHO 2023","pontos":72000,"participantes":54,"transacoes":54,"area":"BU RIO","status":"ATIVO","verba":72000.0,"atribuido":7200.0},{"campanha":"ULP MARÇO 2023 NNE","pontos":70500,"participantes":47,"transacoes":47,"area":"BU NNE","status":"ATIVO","verba":70500.0,"atribuido":7050.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO - BOOST CRICKET 2025","pontos":70260,"participantes":163,"transacoes":163,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":7026.0},{"campanha":"SALDO PLATAFORMA ANTIGA INATIVOS","pontos":69566,"participantes":2,"transacoes":2,"area":"Incentivos","status":"ATIVO","verba":6956.68,"atribuido":6956.68},{"campanha":"BIC DECOR & EZ REACH DEZEMBRO 2024","pontos":67800,"participantes":186,"transacoes":186,"area":"Parceria","status":"ATIVO","verba":6675.0,"atribuido":6675.0},{"campanha":"CONECTA VOCÊ E BAT AGOSTO 2025","pontos":67250,"participantes":68,"transacoes":69,"area":"IC - DIGITAL","status":"ATIVO","verba":1000000.0,"atribuido":6725.0},{"campanha":"NOVO VISUAL CONECTA BAT - CTO E NNE FEVEREIRO 2025","pontos":66000,"participantes":66,"transacoes":66,"area":"IC - DIGITAL","status":"ATIVO","verba":6700.0,"atribuido":6600.0},{"campanha":"COPA PRIME OUTUBRO 2022 SUL","pontos":65500,"participantes":15,"transacoes":15,"area":"Prime","status":"ATIVO","verba":65500.0,"atribuido":6550.0},{"campanha":"TRIPLICE COROA AGOSTO 2024","pontos":64000,"participantes":169,"transacoes":169,"area":"Parceria","status":"ATIVO","verba":6390.0,"atribuido":6390.0},{"campanha":"BONIFICAÇÃO EXTRA COORDENADOR AGOSTO 2023","pontos":64000,"participantes":8,"transacoes":8,"area":"Parceria","status":"ATIVO","verba":64000.0,"atribuido":6400.0},{"campanha":"EVERLAST MARÇO 2024","pontos":63100,"participantes":274,"transacoes":274,"area":"Parceria","status":"ATIVO","verba":6500.0,"atribuido":6300.0},{"campanha":"CAMPANHA +MU COORDENADOR_OUTUBRO 2025","pontos":63000,"participantes":8,"transacoes":8,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":6300.0},{"campanha":"BAT STAR KA CNV JANEIRO 2025","pontos":60600,"participantes":32,"transacoes":32,"area":"KA CNV","status":"ATIVO","verba":5050.0,"atribuido":6060.0},{"campanha":"RAYOVAC SETEMBRO 2024","pontos":60000,"participantes":48,"transacoes":48,"area":"Parceria","status":"ATIVO","verba":6000.0,"atribuido":6000.0},{"campanha":"DUNHILL WONDERLUST SPC JUNHO 2024","pontos":60000,"participantes":19,"transacoes":19,"area":"Brands - Dunhill","status":"ATIVO","verba":1600.0,"atribuido":6000.0},{"campanha":"P&G DEZEMBRO 2022","pontos":59000,"participantes":59,"transacoes":59,"area":"Parceria","status":"ATIVO","verba":5900.0,"atribuido":5900.0},{"campanha":"CRICKET NOVEMBRO 2024","pontos":58950,"participantes":80,"transacoes":81,"area":"Parceria","status":"ATIVO","verba":5885.0,"atribuido":5895.0},{"campanha":"CAMPANHA BU CTO PARCERIA OUTUBRO 2023","pontos":58500,"participantes":21,"transacoes":21,"area":"Parceria","status":"ATIVO","verba":58500.0,"atribuido":5850.0},{"campanha":"FOCOS - AÇÕES E CAMPANHAS SPC AGO/SET 2023","pontos":56000,"participantes":16,"transacoes":16,"area":"BU SPC","status":"ATIVO","verba":56000.0,"atribuido":5600.0},{"campanha":"VOLUME HISTÓRICO MARÇO 2023 BU SCP","pontos":55000,"participantes":11,"transacoes":11,"area":"BU SPC","status":"ATIVO","verba":40000.0,"atribuido":5500.0},{"campanha":"COPA PRIME OUTUBRO 2022","pontos":54950,"participantes":17,"transacoes":17,"area":"Prime","status":"ATIVO","verba":540.0,"atribuido":5495.0},{"campanha":"BIC SHAVER DEZEMBRO 2022","pontos":54000,"participantes":54,"transacoes":54,"area":"Parceria","status":"ATIVO","verba":5400.0,"atribuido":5400.0},{"campanha":"CAMPANHA IC DIGITAL SETEMBRO 2025","pontos":54000,"participantes":19,"transacoes":25,"area":"IC - DIGITAL","status":"ATIVO","verba":1000000.0,"atribuido":4200.0},{"campanha":"FOCOS DO MÊS DE JUNHO - BU RIO 2023","pontos":54000,"participantes":23,"transacoes":23,"area":"BU RIO","status":"ATIVO","verba":54000.0,"atribuido":5400.0},{"campanha":"CAMPANHA EVERLAST NNE MARÇO DE 2023","pontos":54000,"participantes":59,"transacoes":59,"area":"BU NNE","status":"ATIVO","verba":5400.0,"atribuido":5400.0},{"campanha":"MISSÃO 85 BU RIO NOVEMBRO 2024","pontos":53000,"participantes":38,"transacoes":66,"area":"BU RIO","status":"ATIVO","verba":5300.0,"atribuido":5300.0},{"campanha":"CAMPANHAS DESTAQUES IC MARÇO 2025","pontos":52000,"participantes":29,"transacoes":29,"area":"IC - DIGITAL","status":"ATIVO","verba":5400.0,"atribuido":5200.0},{"campanha":"PNR BU NNE 2023 - CASO TV ISD","pontos":51985,"participantes":5,"transacoes":5,"area":"BU NNE","status":"ATIVO","verba":51985.1,"atribuido":5198.51},{"campanha":"RELAMPAGO DE ADIMPLÊNCIA PRIME BU CTO -  NOVEMBRO 2023","pontos":51500,"participantes":42,"transacoes":42,"area":"Parceria","status":"ATIVO","verba":51500.0,"atribuido":5150.0},{"campanha":"COMFORT2 NOVEMBRO 2024","pontos":50300,"participantes":76,"transacoes":76,"area":"Parceria","status":"ATIVO","verba":3910.0,"atribuido":4930.0},{"campanha":"CAMPANHA +MU COORDENADOR - SETEMBRO 2025","pontos":50000,"participantes":6,"transacoes":6,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":5000.0},{"campanha":"COPA BIC MAIO 2024","pontos":50000,"participantes":7,"transacoes":7,"area":"Parceria","status":"ATIVO","verba":5000.0,"atribuido":5000.0},{"campanha":"CAMPANHA KENT BU CTO AGOSTO 2023","pontos":49000,"participantes":14,"transacoes":14,"area":"BU CTO","status":"ATIVO","verba":49000.0,"atribuido":4900.0},{"campanha":"ROTHMANS SENSES FRESH NNE JANEIRO 2025 ","pontos":47000,"participantes":22,"transacoes":22,"area":"Brands - Rothmans","status":"ATIVO","verba":4700.0,"atribuido":4700.0},{"campanha":"+MU NOVEMBRO 2023","pontos":45450,"participantes":47,"transacoes":47,"area":"Parceria","status":"ATIVO","verba":21700.0,"atribuido":4545.0},{"campanha":"PARCERIA CAMPANHA CAMISAS ABRIL 2023","pontos":45000,"participantes":15,"transacoes":15,"area":"Parceria","status":"ATIVO","verba":39000.0,"atribuido":4500.0},{"campanha":"TRIPLICE COROA SETEMBRO 2024","pontos":44300,"participantes":54,"transacoes":54,"area":"Parceria","status":"ATIVO","verba":4430.0,"atribuido":4430.0},{"campanha":"CAMPANHA AÇÃO ENGOV AGOSTO 2025","pontos":44000,"participantes":27,"transacoes":31,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":4400.0},{"campanha":"RELAMPAGO PRIME CTO JANEIRO 2024","pontos":42500,"participantes":21,"transacoes":21,"area":"BU CTO","status":"ATIVO","verba":42500.0,"atribuido":4250.0},{"campanha":"COORDENADORES DEZEMBRO 2023","pontos":40000,"participantes":8,"transacoes":8,"area":"Parceria","status":"ATIVO","verba":40000.0,"atribuido":4000.0},{"campanha":"BIC SHAVER COORDENADOR OUTUBRO 2023","pontos":40000,"participantes":3,"transacoes":3,"area":"Parceria","status":"ATIVO","verba":40000.0,"atribuido":4000.0},{"campanha":"FOCOS DE MAIO 2023 BU RIO","pontos":40000,"participantes":17,"transacoes":17,"area":"BU RIO","status":"ATIVO","verba":42000.0,"atribuido":4000.0},{"campanha":"VENDAS + UPSKILL - MISSÃO 1 MARÇO 2024","pontos":39500,"participantes":79,"transacoes":79,"area":"BU SPR","status":"ATIVO","verba":4000.0,"atribuido":4000.0},{"campanha":"CAMPANHA ENGOV 2025","pontos":38850,"participantes":37,"transacoes":37,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":3885.0},{"campanha":"+MU LITORAL JUNHO 2024\t","pontos":37700,"participantes":10,"transacoes":10,"area":"Parceria","status":"ATIVO","verba":3770.0,"atribuido":3770.0},{"campanha":"POSITIVAÇÃO RV SUL JUNHO 2023","pontos":37010,"participantes":24,"transacoes":24,"area":"BU SUL","status":"ATIVO","verba":37010.0,"atribuido":3701.0},{"campanha":"COPA BIC JUNHO 2024","pontos":37000,"participantes":5,"transacoes":5,"area":"Parceria","status":"ATIVO","verba":3500.0,"atribuido":3700.0},{"campanha":"CONECTA VOCÊ BU CTO NOVEMBRO 2024","pontos":36000,"participantes":18,"transacoes":18,"area":"BU CTO","status":"ATIVO","verba":3600.0,"atribuido":3600.0},{"campanha":"FOGO NO PARQUINHO OUTUBRO 2023","pontos":36000,"participantes":18,"transacoes":18,"area":"Brands - Rothmans","status":"ATIVO","verba":36000.0,"atribuido":3600.0},{"campanha":"CAMPANHA +MU COORDENADOR - NOVEMBRO 2025","pontos":35000,"participantes":5,"transacoes":5,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":3500.0},{"campanha":"FINI PASTILHA SETEMBRO 2024","pontos":34700,"participantes":93,"transacoes":94,"area":"Parceria","status":"ATIVO","verba":3270.0,"atribuido":3470.0},{"campanha":"NEW UI UX - QUIZ DA JORNADA DE COMPRA NOVEMBRO 2024","pontos":32000,"participantes":31,"transacoes":32,"area":"IC - DIGITAL","status":"ATIVO","verba":3300.0,"atribuido":3200.0},{"campanha":"INTEGRAÇÇÃO CONECTA VOCÊ + CONECTA BAT","pontos":32000,"participantes":19,"transacoes":19,"area":"IC - DIGITAL","status":"ATIVO","verba":35000.0,"atribuido":3200.0},{"campanha":"ESTRELAS TURBINADAS ABRIL +BOOST BOBINA 2025","pontos":30840,"participantes":287,"transacoes":287,"area":"Parceria","status":"ATIVO","verba":3063.0,"atribuido":3066.0},{"campanha":"FINI PASTILHA JULHO 2024","pontos":30500,"participantes":48,"transacoes":48,"area":"Parceria","status":"ATIVO","verba":3050.0,"atribuido":3050.0},{"campanha":"FOCOS FEVEREIRO 2025","pontos":30000,"participantes":20,"transacoes":20,"area":"BU RIO","status":"ATIVO","verba":3000.0,"atribuido":3000.0},{"campanha":"MAIS MU COODENADORES MARÇO 2025","pontos":30000,"participantes":6,"transacoes":6,"area":"Parceria","status":"ATIVO","verba":30000.0,"atribuido":3000.0},{"campanha":"CAMPANHA +MU COORDENADOR - AGOSTO 2025","pontos":30000,"participantes":4,"transacoes":4,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":3000.0},{"campanha":"JOGANDO JUNTO SPC JUNHO 2025","pontos":29000,"participantes":19,"transacoes":29,"area":"BU SPC","status":"ATIVO","verba":100000.0,"atribuido":2900.0},{"campanha":"VOLUME MARÇO 2023 CTO","pontos":28000,"participantes":4,"transacoes":4,"area":"BU CTO","status":"ATIVO","verba":28000.0,"atribuido":2800.0},{"campanha":"QUIZ CONEXÃO COMERCIAL ABRIL 2025","pontos":27000,"participantes":9,"transacoes":9,"area":"Incentivos","status":"ATIVO","verba":3000.0,"atribuido":2700.0},{"campanha":"ADESÃO PRIME BU NNE JUNHO 2024","pontos":27000,"participantes":9,"transacoes":9,"area":"BU NNE","status":"ATIVO","verba":2700.0,"atribuido":2700.0},{"campanha":"CAMPANHA PARCERIA SPC NOVEMBRO DE 2022","pontos":26000,"participantes":9,"transacoes":9,"area":"BU SPC","status":"ATIVO","verba":2800.0,"atribuido":2600.0},{"campanha":"CAMPANHA RECONHECIMENTO FOCOS RIO MARÇO DE 2023","pontos":26000,"participantes":13,"transacoes":26,"area":"BU RIO","status":"ATIVO","verba":26000.0,"atribuido":2600.0},{"campanha":"CONECTA VOCÊ E BAT JULHO 2025","pontos":25000,"participantes":25,"transacoes":25,"area":"IC - DIGITAL","status":"ATIVO","verba":100000.0,"atribuido":2500.0},{"campanha":"POSITIVAÇÃO W5 SPR + BOOST OUTUBRO 2023","pontos":25000,"participantes":14,"transacoes":20,"area":"Parceria","status":"ATIVO","verba":23500.0,"atribuido":2500.0},{"campanha":"ROTHMANS REALEZA DIGITAL OUTUBRO 2024","pontos":24000,"participantes":12,"transacoes":12,"area":"Brands - Rothmans","status":"ATIVO","verba":2400.0,"atribuido":2400.0},{"campanha":"COPA PRIME SETEMBRO 2022","pontos":23900,"participantes":10,"transacoes":10,"area":"Prime","status":"ATIVO","verba":23900.0,"atribuido":2390.0},{"campanha":"CAMPANHA KENT NEXT STEPS JANEIRO 2026","pontos":23500,"participantes":10,"transacoes":12,"area":"Brands - Kent","status":"ATIVO","verba":1000000.0,"atribuido":2350.0},{"campanha":"ROTA DE SUCESSO KA CNV JUNHO 2024","pontos":23000,"participantes":23,"transacoes":23,"area":"KA CNV","status":"ATIVO","verba":2500.0,"atribuido":2300.0},{"campanha":"CAMPANHA INTERNA BU CTO OUTUBRO 2025","pontos":23000,"participantes":5,"transacoes":5,"area":"BU CTO","status":"ATIVO","verba":100000.0,"atribuido":2300.0},{"campanha":"PRIME WEEK DEZEMBRO 2023","pontos":21300,"participantes":18,"transacoes":18,"area":"BU CTO","status":"ATIVO","verba":21300.0,"atribuido":2130.0},{"campanha":"EZ REACH MAIO 2024","pontos":21150,"participantes":98,"transacoes":98,"area":"Parceria","status":"ATIVO","verba":2105.0,"atribuido":2105.0},{"campanha":"KENT PRO BRAND MAIO 2025","pontos":21000,"participantes":14,"transacoes":14,"area":"Brands - Kent","status":"ATIVO","verba":100000.0,"atribuido":2100.0},{"campanha":"CAMPANHA IC - ALERT BRASIL BAT ABRIL 2024","pontos":20010,"participantes":13,"transacoes":14,"area":"IC - DIGITAL","status":"ATIVO","verba":2001.0,"atribuido":2001.0},{"campanha":"PRIME DAY BU RIO FEVEREIRO 2024","pontos":20000,"participantes":20,"transacoes":20,"area":"BU RIO","status":"ATIVO","verba":2000.0,"atribuido":2000.0},{"campanha":"CARNAVAL AUMENTO PREMIADO BU SPR MARÇO 2025","pontos":20000,"participantes":10,"transacoes":11,"area":"BU SPR","status":"ATIVO","verba":2000.0,"atribuido":2000.0},{"campanha":"MAIS MU COORDENADORES MAIO 2025","pontos":20000,"participantes":2,"transacoes":2,"area":"Parceria","status":"ATIVO","verba":2000.0,"atribuido":2000.0},{"campanha":"CAMPANHA MAIS MU JUNHO","pontos":20000,"participantes":4,"transacoes":4,"area":"Parceria","status":"ATIVO","verba":30000.0,"atribuido":2000.0},{"campanha":"RAYOVAC AGOSTO 2024","pontos":18500,"participantes":17,"transacoes":17,"area":"Parceria","status":"ATIVO","verba":1750.0,"atribuido":1750.0},{"campanha":"CAMPANHA B2B TV MGS FEVEREIRO 2024","pontos":18500,"participantes":18,"transacoes":18,"area":"BU CTO","status":"ATIVO","verba":2100.0,"atribuido":2100.0},{"campanha":"MAIS MU COODENADORES ABRIL 2025","pontos":18000,"participantes":3,"transacoes":3,"area":"Parceria","status":"ATIVO","verba":1800.0,"atribuido":1800.0},{"campanha":"COPA PRIME AGOSTO 2022","pontos":17750,"participantes":9,"transacoes":9,"area":"Prime","status":"ATIVO","verba":17750.0,"atribuido":1775.0},{"campanha":"CAMPANHA IC - OPERADORES ALMAVIVA JANEIRO 2025","pontos":17500,"participantes":11,"transacoes":11,"area":"IC - DIGITAL","status":"ATIVO","verba":1750.0,"atribuido":1750.0},{"campanha":"CAMPANHA LEPP REGIONAL SPC OUTUBRO DE 2022","pontos":16500,"participantes":11,"transacoes":11,"area":"BU SPC","status":"ATIVO","verba":1650.0,"atribuido":1650.0},{"campanha":"+MU JANEIRO E FEVEREIRO 2024","pontos":16250,"participantes":21,"transacoes":21,"area":"Parceria","status":"ATIVO","verba":500.0,"atribuido":1625.0},{"campanha":"EZ REACH JUNHO 2024","pontos":15700,"participantes":129,"transacoes":129,"area":"Parceria","status":"ATIVO","verba":1570.0,"atribuido":1570.0},{"campanha":"PRIME SPC E SPR JUNHO 2024","pontos":15000,"participantes":10,"transacoes":10,"area":"Prime","status":"ATIVO","verba":1500.0,"atribuido":1500.0},{"campanha":"MAIS MU COODENADORES DEZEMBRO 2025","pontos":15000,"participantes":2,"transacoes":2,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":1500.0},{"campanha":"+MU JUNHO 2024\t","pontos":15000,"participantes":5,"transacoes":5,"area":"Parceria","status":"ATIVO","verba":1200.0,"atribuido":1500.0},{"campanha":"RECONHECIMENTO CONVENÇÃO BU SUL JANEIRO 2025","pontos":15000,"participantes":3,"transacoes":3,"area":"BU SUL","status":"ATIVO","verba":1500.0,"atribuido":1500.0},{"campanha":"COPA PRIME OUTUBRO 2022 SPR","pontos":12900,"participantes":13,"transacoes":13,"area":"Prime","status":"ATIVO","verba":12900.0,"atribuido":1290.0},{"campanha":"CAMPANHA TV - JUNTOS SOMOS MAIS FORTES OUTUBRO 2025","pontos":12100,"participantes":11,"transacoes":11,"area":"BU SUL","status":"ATIVO","verba":10000.0,"atribuido":1210.0},{"campanha":"BU SPC POSITIVAÇÃO MAIO 2023","pontos":12000,"participantes":6,"transacoes":6,"area":"BU SPC","status":"ATIVO","verba":12000.0,"atribuido":1200.0},{"campanha":"CONEXÃO COMERCIAL JULHO 2025","pontos":12000,"participantes":4,"transacoes":6,"area":"Incentivos","status":"ATIVO","verba":100000.0,"atribuido":1200.0},{"campanha":"CAMPANHA VELOZES & FURIOSOS TOP BOC_1°E2ºTRI","pontos":12000,"participantes":2,"transacoes":2,"area":"BU RIO","status":"ATIVO","verba":12000.0,"atribuido":1200.0},{"campanha":"HORIZONTALIZAÇÃO W1 E W2 FEVEREIRO 2023 SUL","pontos":12000,"participantes":4,"transacoes":4,"area":"BU SUL","status":"ATIVO","verba":12000.0,"atribuido":1200.0},{"campanha":"BU SPC POSITIVAÇÃO JULHO 2023","pontos":11500,"participantes":8,"transacoes":9,"area":"BU SPC","status":"ATIVO","verba":3000.0,"atribuido":1150.0},{"campanha":"+MU BOOST SETEMBRO 2024","pontos":11000,"participantes":22,"transacoes":22,"area":"Parceria","status":"ATIVO","verba":1100.0,"atribuido":1100.0},{"campanha":"CAMPANHA POSITIVAÇÃO PARCERIA MAIO 2023 BU NNE","pontos":11000,"participantes":11,"transacoes":22,"area":"BU NNE","status":"ATIVO","verba":5000.0,"atribuido":1100.0},{"campanha":"POSITIVAÇÃO W2 PARCERIA OUTUBRO 2023","pontos":11000,"participantes":11,"transacoes":11,"area":"Parceria","status":"ATIVO","verba":11000.0,"atribuido":1100.0},{"campanha":"NOVO VISUAL CONECTA BAT - SPC NORTE E RJ1 SETEMBRO 2024","pontos":11000,"participantes":11,"transacoes":11,"area":"IC - DIGITAL","status":"ATIVO","verba":1100.0,"atribuido":1100.0},{"campanha":"POSITIVAÇÃO W2 SPR SETEMBRO 2023","pontos":11000,"participantes":11,"transacoes":11,"area":"Parceria","status":"ATIVO","verba":11000.0,"atribuido":1100.0},{"campanha":"MARATONA PRIME SPR BOCS JULHO 2024","pontos":10500,"participantes":5,"transacoes":7,"area":"BU SPR","status":"ATIVO","verba":1050.0,"atribuido":1050.0},{"campanha":"POSITIVAÇÃO W4 SPR SETEMBRO 2023","pontos":10000,"participantes":10,"transacoes":10,"area":"Parceria","status":"ATIVO","verba":10000.0,"atribuido":1000.0},{"campanha":"PREMIAÇÃO OPERAÇÃO - APOIO NEW TELESALES NOVEMBRO 2024","pontos":10000,"participantes":2,"transacoes":4,"area":"IC - DIGITAL","status":"ATIVO","verba":1000.0,"atribuido":1000.0},{"campanha":"POSITIVAÇÃO W4 PARCERIA OUTUBRO 2023","pontos":10000,"participantes":10,"transacoes":10,"area":"Parceria","status":"ATIVO","verba":11000.0,"atribuido":1100.0},{"campanha":"POSITIVAÇÃO W3 PARCERIA OUTUBRO 2023","pontos":10000,"participantes":10,"transacoes":10,"area":"Parceria","status":"ATIVO","verba":10000.0,"atribuido":1000.0},{"campanha":"CAMPANHA MAIS MU JULHO - COORDENADOR","pontos":10000,"participantes":2,"transacoes":2,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":1000.0},{"campanha":"HORIZONTALIZAÇÃO JUNHO 2022 SUL","pontos":10000,"participantes":4,"transacoes":4,"area":"BU SUL","status":"ATIVO","verba":10000.0,"atribuido":1000.0},{"campanha":"POSITIVAÇÃO W1 PARCERIA OUTUBRO 2023","pontos":9000,"participantes":8,"transacoes":9,"area":"Parceria","status":"ATIVO","verba":9000.0,"atribuido":900.0},{"campanha":"CAMPANHA IC DIGITAL_OUTUBRO 2025","pontos":8000,"participantes":2,"transacoes":2,"area":"IC - DIGITAL","status":"ATIVO","verba":10000.0,"atribuido":200.0},{"campanha":"POSITIVAÇÃO W4 SPR OUTUBRO 2023","pontos":8000,"participantes":10,"transacoes":10,"area":"BU SPR","status":"ATIVO","verba":8000.0,"atribuido":800.0},{"campanha":"CRICKET JANEIRO 2025","pontos":8000,"participantes":4,"transacoes":8,"area":"Parceria","status":"ATIVO","verba":400.0,"atribuido":800.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS NOVEMBRO 2025","pontos":8000,"participantes":5,"transacoes":5,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":800.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS DEZEMBRO 2025","pontos":8000,"participantes":5,"transacoes":5,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":800.0},{"campanha":"PRIME BU RIO FEVEREIRO 2025","pontos":7900,"participantes":9,"transacoes":9,"area":"BU RIO","status":"ATIVO","verba":790.0,"atribuido":790.0},{"campanha":"POSITIVAÇÃO W3 SPR OUTUBRO 2023","pontos":7200,"participantes":9,"transacoes":9,"area":"BU SPR","status":"ATIVO","verba":7200.0,"atribuido":720.0},{"campanha":"REDUÇÃO DE DESVIO GROCERY JUNHO 2025","pontos":7000,"participantes":4,"transacoes":4,"area":"IC - DIGITAL","status":"ATIVO","verba":20000.0,"atribuido":700.0},{"campanha":"POSITIVAÇÃO RV TV RECIFE JULHO 2023","pontos":7000,"participantes":7,"transacoes":7,"area":"BU NNE","status":"ATIVO","verba":7000.0,"atribuido":700.0},{"campanha":"CAMPANHA KENT PRO RED_NOVEMBRO_2025","pontos":7000,"participantes":2,"transacoes":2,"area":"Brands - Kent","status":"ATIVO","verba":10000.0,"atribuido":700.0},{"campanha":"CAMPANHA PIX PRIME AGOSTO 2023","pontos":6500,"participantes":7,"transacoes":7,"area":"Prime","status":"ATIVO","verba":6500.0,"atribuido":650.0},{"campanha":"POSITIVAÇÃO W2 SPR OUTUBRO 2023","pontos":6400,"participantes":8,"transacoes":8,"area":"BU SPR","status":"ATIVO","verba":6400.0,"atribuido":640.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS JUNHO 2025","pontos":6000,"participantes":4,"transacoes":6,"area":"BU RIO","status":"ATIVO","verba":50000.0,"atribuido":600.0},{"campanha":"CUSTOMER ON THE ROAD MARÇO 2025","pontos":6000,"participantes":3,"transacoes":3,"area":"Conecta Você","status":"ATIVO","verba":600.0,"atribuido":600.0},{"campanha":"CAMPANHA VELOZES & FURIOSOS TOP TV 3° TRI","pontos":6000,"participantes":1,"transacoes":1,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":600.0},{"campanha":"LUCKY STRIKE F&S POA 2 BU SUL JANEIRO 2025","pontos":6000,"participantes":1,"transacoes":1,"area":"BU SUL","status":"ATIVO","verba":600.0,"atribuido":600.0},{"campanha":"CAMPANHA VELOZES & FURIOSOS TOP BOC 3° TRI","pontos":6000,"participantes":1,"transacoes":1,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":600.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS_OUTUBRO 2025","pontos":5500,"participantes":4,"transacoes":4,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":550.0},{"campanha":"DUNHILL WONDERLUST BU SUL 2024","pontos":5000,"participantes":1,"transacoes":1,"area":"BU SUL","status":"ATIVO","verba":500.0,"atribuido":500.0},{"campanha":"RAYOVAC JULHO 2024","pontos":5000,"participantes":10,"transacoes":10,"area":"Parceria","status":"ATIVO","verba":500.0,"atribuido":500.0},{"campanha":"ACELERA SHARE CTO TV CGR JULHO 2024","pontos":5000,"participantes":1,"transacoes":1,"area":"BU CTO","status":"ATIVO","verba":1000.0,"atribuido":500.0},{"campanha":"CAMPANHA INTERNA TV RECIFE NOVEMBRO 2025","pontos":4920,"participantes":1,"transacoes":1,"area":"BU NNE","status":"ATIVO","verba":12000.0,"atribuido":492.0},{"campanha":"QUIZ TREINAMENTO CONECTA VOCÊ FEVEREIRO 2025","pontos":4500,"participantes":2,"transacoes":2,"area":"Conecta Você","status":"ATIVO","verba":450.0,"atribuido":450.0},{"campanha":"PRIME NOVAS ADESÕES BU CTO MARÇO 2024 ","pontos":4500,"participantes":3,"transacoes":3,"area":"BU CTO","status":"ATIVO","verba":450.0,"atribuido":450.0},{"campanha":"GROW UP BU SUL IC DIGITAL MAIO 2025","pontos":4500,"participantes":3,"transacoes":3,"area":"IC - DIGITAL","status":"ATIVO","verba":450.0,"atribuido":450.0},{"campanha":"ADESÃO PRIME BU RIO AGOSTO 2024","pontos":4000,"participantes":4,"transacoes":4,"area":"BU RIO","status":"ATIVO","verba":300.0,"atribuido":400.0},{"campanha":"POSITIVAÇÃO W1 SPR OUTUBRO 2023","pontos":3200,"participantes":4,"transacoes":4,"area":"BU SPR","status":"ATIVO","verba":3200.0,"atribuido":320.0},{"campanha":"PARCERIA POSITIVAÇÃO JUNHO 2023 BU NNE","pontos":3003,"participantes":3,"transacoes":6,"area":"BU NNE","status":"ATIVO","verba":5000.0,"atribuido":300.3},{"campanha":"CAMPANHA VELOZES E FURIOSOS_SETEMBRO 2025","pontos":3000,"participantes":3,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":300.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS AGOSTO 2025","pontos":3000,"participantes":3,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":100000.0,"atribuido":300.0},{"campanha":"CAMPANHA KENT PRO RED_OUTUBRO 2025","pontos":3000,"participantes":2,"transacoes":2,"area":"Brands - Kent","status":"ATIVO","verba":100000.0,"atribuido":300.0},{"campanha":"BATEU LEVOU BU CTO OUTUBRO 2024","pontos":3000,"participantes":1,"transacoes":1,"area":"BU CTO","status":"ATIVO","verba":900.0,"atribuido":300.0},{"campanha":"FINI FEVEREIRO 2024","pontos":3000,"participantes":1,"transacoes":1,"area":"Parceria","status":"ATIVO","verba":300.0,"atribuido":300.0},{"campanha":"VELOZES & FURIOSOS BU RIO JANEIRO 2025","pontos":3000,"participantes":3,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":3000.0,"atribuido":300.0},{"campanha":"VELOZES & FURIOSOS BU RIO MAIO 2025","pontos":3000,"participantes":3,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":20000.0,"atribuido":300.0},{"campanha":"VELOZES & FURIOSOS BU RIO FEVEREIRO 2025","pontos":3000,"participantes":2,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":300.0,"atribuido":300.0},{"campanha":"VELOZES & FURIOSOS BU RIO ABRIL 2025","pontos":3000,"participantes":3,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":300.0,"atribuido":300.0},{"campanha":"VELOZES & FURIOSOS BU RIO MARÇO 2025","pontos":3000,"participantes":2,"transacoes":3,"area":"BU RIO","status":"ATIVO","verba":300.0,"atribuido":300.0},{"campanha":"PRIME SUL NOVEMBRO 2024","pontos":2500,"participantes":1,"transacoes":1,"area":"BU SUL","status":"ATIVO","verba":250.0,"atribuido":250.0},{"campanha":"CAMPANHA VELOZES E FURIOSOS JULHO 2025","pontos":2500,"participantes":1,"transacoes":1,"area":"BU RIO","status":"ATIVO","verba":5000.0,"atribuido":250.0},{"campanha":"ADIMPLÊNCIA BASE BOOST SPC JULHO 2023","pontos":2500,"participantes":1,"transacoes":1,"area":"BU SPC","status":"ATIVO","verba":2500.0,"atribuido":250.0},{"campanha":"RELAMPAGO PRIME BU RIO TV SEM MAIO 2024","pontos":2000,"participantes":2,"transacoes":2,"area":"BU RIO","status":"ATIVO","verba":200.0,"atribuido":200.0},{"campanha":"POSITIVAÇÃO NNE JULHO 2023","pontos":2000,"participantes":2,"transacoes":2,"area":"BU NNE","status":"ATIVO","verba":2000.0,"atribuido":200.0},{"campanha":"TESTE LEAF MAIO 2024","pontos":2000,"participantes":2,"transacoes":2,"area":"LEAF","status":"ATIVO","verba":1000.0,"atribuido":5.0},{"campanha":"CAMPANHA PARCEIRO FOCO (FINI)_JANEIRO 2025","pontos":1500,"participantes":1,"transacoes":1,"area":"Parceria","status":"ATIVO","verba":10000.0,"atribuido":150.0},{"campanha":"QUIZ TREINAMENTO RJ3 AGOSTO 2025","pontos":1000,"participantes":2,"transacoes":2,"area":"BU RIO","status":"ATIVO","verba":10000.0,"atribuido":100.0},{"campanha":"AÇÃO DE ABERTURA DE VAREJO TV RJ2 - PROMOTOR JULHO 2023","pontos":1000,"participantes":1,"transacoes":1,"area":"BU RIO","status":"ATIVO","verba":1000.0,"atribuido":100.0},{"campanha":"BIC COMFORT NOVEMBRO 2024","pontos":800,"participantes":1,"transacoes":1,"area":"Parceria","status":"ATIVO","verba":80.0,"atribuido":80.0},{"campanha":"TESTE LANÇAMENTO","pontos":355,"participantes":2,"transacoes":3,"area":"Teste Lançamento","status":"ATIVO","verba":100.0,"atribuido":25.5}],"campanhas_fin":[{"campanha":"MISSÃO PRIME DEZEMBRO 2023","area":"Prime","status":"ATIVO","verba":9181400.0,"atribuido":91814.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JUNHO 2025","area":"Parceria","status":"ATIVO","verba":2000000.0,"atribuido":189809.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO - BOOST P&G","area":"Parceria","status":"ATIVO","verba":2000000.0,"atribuido":43317.0},{"campanha":"LUCKY STRIKE F&S XL - JULHO'25","area":"Brands - Lucky Strike","status":"ATIVO","verba":2000000.0,"atribuido":21400.0},{"campanha":"CAMPANHA PARCERIA P&G MAIO 2023","area":"Parceria","status":"ATIVO","verba":1485000.0,"atribuido":146600.0},{"campanha":"MISSÃO PRIME NOVEMBRO 2023","area":"Prime","status":"ATIVO","verba":1044170.0,"atribuido":104677.0},{"campanha":"LUCKY STRIKE F&S XL SPC, SPR E CTO - JUNHO'25","area":"Brands - Lucky Strike","status":"ATIVO","verba":1000000.0,"atribuido":132900.0},{"campanha":"CAMPANHA SHARE EU VOU BU CTO JUNHO 2025","area":"BU CTO","status":"ATIVO","verba":1000000.0,"atribuido":32600.0},{"campanha":"BAT STARS JUNHO 2025","area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":31000.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO - BOOST ENGOV","area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":8033.0},{"campanha":"BAT MASTER JULHO 2025","area":"KA CNV","status":"ATIVO","verba":1000000.0,"atribuido":39500.0},{"campanha":"KENT PRO BRAND JUNHO 2025","area":"Brands - Kent","status":"ATIVO","verba":1000000.0,"atribuido":9995.0},{"campanha":"RANKING MENSAL JULHO 2025","area":"Incentivos","status":"ATIVO","verba":1000000.0,"atribuido":16530.0},{"campanha":"CONECTA VOCÊ E BAT AGOSTO 2025","area":"IC - DIGITAL","status":"ATIVO","verba":1000000.0,"atribuido":6725.0},{"campanha":"LANÇAMENTO DUNHILL OUTUBRO 25","area":"Brands - Dunhill","status":"ATIVO","verba":1000000.0,"atribuido":89200.0}],"areas_financeiro":[{"area":"Parceria","verba":33168290.5,"atribuido":6621365.8,"util":19.96},{"area":"Prime","verba":13908685.0,"atribuido":947441.0,"util":6.81},{"area":"Incentivos","verba":7212120.03,"atribuido":2715606.93,"util":37.65},{"area":"KA CNV","verba":7105890.0,"atribuido":317260.0,"util":4.46},{"area":"Brands - Lucky Strike","verba":4466166.0,"atribuido":917018.2,"util":20.53},{"area":"BU CTO","verba":2526150.0,"atribuido":284220.0,"util":11.25},{"area":"Brands - Dunhill","verba":2437600.0,"atribuido":937450.0,"util":38.46},{"area":"IC - DIGITAL","verba":2290801.0,"atribuido":142026.0,"util":6.2},{"area":"Brands - Kent","verba":2228708.0,"atribuido":36426.0,"util":1.63},{"area":"BU NNE","verba":1196285.1,"atribuido":81313.31,"util":6.8},{"area":"BU RIO","verba":938193.0,"atribuido":198457.0,"util":21.15},{"area":"BU SPR","verba":571450.0,"atribuido":64731.0,"util":11.33},{"area":"BU SPC","verba":240550.0,"atribuido":40650.0,"util":16.9},{"area":"Brands - Rothmans","verba":192858.0,"atribuido":192858.0,"util":100.0},{"area":"CX BRASIL","verba":151350.0,"atribuido":64500.0,"util":42.62},{"area":"BU SUL","verba":91145.0,"atribuido":37981.0,"util":41.67},{"area":"Conecta Você","verba":1050.0,"atribuido":1050.0,"util":100.0},{"area":"LEAF","verba":1000.0,"atribuido":5.0,"util":0.5},{"area":"Teste Lançamento","verba":100.0,"atribuido":25.5,"util":25.5}],"area_pontos":[{"area":"Parceria","pontos":67024078},{"area":"Incentivos","pontos":20972266},{"area":"Brands - Lucky Strike","pontos":9790072},{"area":"Prime","pontos":9475400},{"area":"Brands - Dunhill","pontos":9400500},{"area":"KA CNV","pontos":3200600},{"area":"BU CTO","pontos":2856700},{"area":"BU RIO","pontos":1983570},{"area":"Brands - Rothmans","pontos":1942730},{"area":"IC - DIGITAL","pontos":1439760}],"estados":[{"estado":"SP","pontos":26057915},{"estado":"RS","pontos":20421173},{"estado":"RJ","pontos":14754681},{"estado":"MG","pontos":11015019},{"estado":"PR","pontos":8432042},{"estado":"SC","pontos":8430813},{"estado":"BA","pontos":8383165},{"estado":"PE","pontos":6037863},{"estado":"CE","pontos":6004867},{"estado":"GO","pontos":5063613}],"cad_estado":[{"estado":"SP","cadastros":384},{"estado":"RS","cadastros":334},{"estado":"MG","cadastros":151},{"estado":"PR","cadastros":138},{"estado":"RJ","cadastros":126},{"estado":"SC","cadastros":112},{"estado":"BA","cadastros":56},{"estado":"CE","cadastros":53},{"estado":"PE","cadastros":50},{"estado":"GO","cadastros":48}],"anos":[{"ano":2023,"pontos":39877578},{"ano":2024,"pontos":47412945},{"ano":2025,"pontos":41647710},{"ano":2026,"pontos":8761270}],"estrelas":[{"campanha":"CAMPANHA ESTRELAS TURBINADAS AGOSTO 2025","pontos":2291850,"participantes":518,"transacoes":518,"area":"Parceria","status":"ATIVO","verba":500000.0,"atribuido":228585.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JULHO 2025","pontos":2150540,"participantes":509,"transacoes":509,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":214529.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS SETEMBRO 2025","pontos":2027940,"participantes":540,"transacoes":540,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":202509.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS MAIO 2025","pontos":1988260,"participantes":479,"transacoes":482,"area":"Parceria","status":"ATIVO","verba":200000.0,"atribuido":194893.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS JUNHO 2025","pontos":1910960,"participantes":454,"transacoes":457,"area":"Parceria","status":"ATIVO","verba":2000000.0,"atribuido":189809.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS DEZEMBRO 2025","pontos":1813740,"participantes":529,"transacoes":529,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":180974.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS_OUTUBRO_2025","pontos":1648710,"participantes":518,"transacoes":519,"area":"Parceria","status":"ATIVO","verba":100000.0,"atribuido":164629.0},{"campanha":"CAMPANHA ESTRELAS TURBINADAS NOVEMBRO 2025","pontos":1574820,"participantes":483,"transacoes":484,"area":"Parceria","status":"ATIVO","verba":1000000.0,"atribuido":157222.0},{"campanha":"ESTRELAS TURBINADAS ABRIL 2025","pontos":1513680,"participantes":372,"transacoes":372,"area":"Parceria","status":"ATIVO","verba":149988.0,"atribuido":150162.0},{"campanha":"ESTRELAS TURBINADAS MARÇO 2025","pontos":1441080,"participantes":399,"transacoes":399,"area":"Parceria","status":"ATIVO","verba":128721.0,"atribuido":143427.0},{"campanha":"ESTRELAS TURBINADAS FEVEREIRO 2025","pontos":887400,"participantes":253,"transacoes":253,"area":"Parceria","status":"ATIVO","verba":89274.0,"atribuido":88740.0},{"campanha":"ESTRELAS TURBINADAS JANEIRO 2025","pontos":682890,"participantes":185,"transacoes":185,"area":"Parceria","status":"ATIVO","verba":67629.0,"atribuido":67629.0}],"meses":["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]};
+
+// ═══════════════════════════════════════════════════════════
+//  ESTADO
+// ═══════════════════════════════════════════════════════════
+let D = null;
+const charts = {};
+let visY = {'2023':true,'2024':true,'2025':true};
+let cpg=1, vpg=1;
+const PSZ=25;
+const PAGES={executivo:'Visão Executiva',financeiro:'Painel Financeiro',campanhas:'Campanhas',regional:'Análise Regional',vendedores:'Vendedores',temporal:'Análise Temporal',ranking:'Ranking'};
+const SUBS={executivo:'Consolidado real — Fev/2023 a Mai/2026',financeiro:'Verba, Atribuição e Saldo por Área',campanhas:'Performance e volume de campanhas reais',regional:'Distribuição geográfica de pontos',vendedores:'Top 50 vendedores por pontos acumulados',temporal:'Evolução mensal e comparativa',ranking:'Top performers por dimensão'};
+
+// ═══════════════════════════════════════════════════════════
+//  FORMATAÇÃO
+// ═══════════════════════════════════════════════════════════
+const fN=(v,d=0)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+const fR=(v)=>'R$ '+fN(v,2);
+const fM=(v)=>{if(v>=1e9)return'R$ '+fN(v/1e9,2)+' bi';if(v>=1e6)return'R$ '+fN(v/1e6,2)+' M';if(v>=1e3)return'R$ '+fN(v/1e3,1)+' K';return'R$ '+fN(v,2);};
+const fP=(v)=>{if(v>=1e9)return fN(v/1e9,2)+' bi';if(v>=1e6)return fN(v/1e6,2)+' M';if(v>=1e3)return fN(v/1e3,1)+' K';return fN(v);};
+const rkN=(i)=>{const cl=i===0?'r1c':i===1?'r2c':i===2?'r3c':'rnc';return`<span class="rk ${cl}">${i+1}</span>`;};
+const pillS=(s)=>{const on=String(s).toUpperCase()==='ATIVO';return`<span class="pill ${on?'pill-on':'pill-off'}">${on?'ATIVO':'INATIVO'}</span>`;};
+const pbar=(v,mx,cl='')=>{const p=mx>0?Math.min(v/mx*100,100):0;return`<div class="pb-w"><div class="pb"><div class="pf ${cl}" style="width:${p.toFixed(1)}%"></div></div><span class="pv">${p.toFixed(0)}%</span></div>`;};
+
+// ═══════════════════════════════════════════════════════════
+//  CHART DEFAULTS
+// ═══════════════════════════════════════════════════════════
+Chart.defaults.color='rgba(241,240,255,.45)';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family="'DM Sans',sans-serif";
+Chart.defaults.font.size=11;
+const C={p1:'#7c3aed',p2:'#8b5cf6',p3:'#a78bfa',p4:'#c084fc',gold:'#f59e0b',cyan:'#22d3ee',green:'#10b981',red:'#f43f5e',blue:'#3b82f6',orange:'#f97316',pink:'#ec4899',pal:['#7c3aed','#f59e0b','#22d3ee','#10b981','#f43f5e','#3b82f6','#ec4899','#f97316','#a78bfa','#34d399']};
+
+function mkC(id,cfg){
+  const el=document.getElementById(id);
+  if(!el)return null;
+  if(charts[id]){charts[id].destroy();}
+  charts[id]=new Chart(el,cfg);
+  return charts[id];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT — usa dados embutidos, opcionalmente carrega XLSX
+// ═══════════════════════════════════════════════════════════
+async function init(){
+  document.getElementById('lts').textContent='Processando dados…';
+  // Usa dados embutidos imediatamente
+  D = EMBED;
+  await new Promise(r=>setTimeout(r,300));
+  renderAll();
+  hideLoader();
+  // Tenta também carregar XLSX se disponível (para atualização)
+  tryLoadXLSX();
+}
+
+async function tryLoadXLSX(){
+  try{
+    const res = await fetch('dashboard_unico.xlsx');
+    if(!res.ok) return; // sem XLSX? usa embutido silenciosamente
+    const ab = await res.arrayBuffer();
+    const wb = XLSX.read(ab,{type:'array',cellDates:true});
+    D = processWB(wb);
+    renderAll();
+  }catch(e){ /* sem XLSX disponível — dados embutidos em uso */ }
+}
+
+async function updateFromXLSX(){
+  try{
+    const res = await fetch('dashboard_unico.xlsx');
+    if(!res.ok){alert('XLSX não encontrado. Usando dados embutidos.');return;}
+    const ab = await res.arrayBuffer();
+    const wb = XLSX.read(ab,{type:'array',cellDates:true});
+    D = processWB(wb);
+    renderAll();
+    alert('Dashboard atualizado com dados do XLSX!');
+  }catch(e){alert('Erro ao carregar XLSX: '+e.message);}
+}
+
+function parseNum(v){
+  if(v===null||v===undefined||v==='')return 0;
+  if(typeof v==='number')return v;
+  return parseFloat(String(v).replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.'))||0;
+}
+
+function processWB(wb){
+  const toA=(n)=>{const s=wb.Sheets[n];if(!s)return[];return XLSX.utils.sheet_to_json(s,{defval:''});};
+  const BL=['saldo plataforma antiga','ranking 2022','ranking 2023','ranking 2024','ranking 2025'];
+  const kpisR=toA('KPIs');const tl=toA('Timeline');const reg=toA('Regionais');
+  const rnk=toA('Rankings');const camp=toA('Campanhas');const finA=toA('Financeiro_Area');
+  const fin=toA('Financeiro');const cal=toA('Calendario');
+  const kpis={};kpisR.forEach(r=>{kpis[r.KPI]=r.Valor;});
+  const tlL=tl.map(r=>String(r.AnoMes));
+  const tlC=tl.map(r=>parseNum(r.Pontos_Credito));
+  const byYM={};tl.forEach(r=>{const[y,m]=String(r.AnoMes).split('-');if(!byYM[y])byYM[y]={};byYM[y][parseInt(m)]=parseNum(r.Pontos_Credito);});
+  const mth=(y)=>Array.from({length:12},(_,i)=>(byYM[y]||{})[i+1]||0);
+  const tmM={};cal.forEach(r=>{const k=`${r.Ano} T${r.Trim}`;tmM[k]=(tmM[k]||0)+parseNum(r.Pontos||0);});
+  const tLb=Object.keys(tmM).sort();const tV=tLb.map(k=>tmM[k]);
+  const rd=reg.map(r=>({regional:r.Regional_Nome||r.Regional,pontos:parseNum(r.Pontos_Total),ativos:parseNum(r.Vendedores),cadastros:parseNum(r.Cadastros)})).filter(r=>r.pontos>0).sort((a,b)=>b.pontos-a.pontos);
+  const vd=rnk.map((r,i)=>({rank:parseNum(r.Rank||i+1),nome:r.Nome||'N/D',regional:r.Regional_Nome||r.Regional||'N/D',estado:r['Estado / Entrega']||'',pontos:parseNum(r.Pontos)})).filter(r=>r.pontos>0).sort((a,b)=>a.rank-b.rank);
+  const cd=camp.map(r=>({campanha:r.Campanha||'',pontos:parseNum(r.Pontos),participantes:parseNum(r.Participantes),transacoes:parseNum(r.Transacoes),area:r.Area||'',status:r.Status||'ATIVO',verba:parseNum(r.Verba),atribuido:parseNum(r.Atribuido)})).filter(r=>r.campanha&&r.pontos>0&&!BL.includes(r.campanha.toLowerCase().trim())).sort((a,b)=>b.pontos-a.pontos);
+  const fA=finA.map(r=>({area:r.Area,verba:parseNum(r.Verba),atribuido:parseNum(r.Atribuido),util:parseNum(r.Utilizacao_pct)})).filter(r=>r.verba>0).sort((a,b)=>b.verba-a.verba);
+  const fCT=[...fin].map(r=>({campanha:r.Campanha,area:r.Area,status:r.Ativa||'ATIVO',verba:parseNum(r.Verba||r.Verba_num),atribuido:parseNum(r.Atribuido||r.Atribuido_num)})).filter(r=>r.campanha&&r.verba>0&&!BL.includes((r.campanha||'').toLowerCase().trim())).sort((a,b)=>b.verba-a.verba).slice(0,15);
+  const apm={};cd.forEach(c=>{if(c.area)apm[c.area]=(apm[c.area]||0)+c.pontos;});
+  const ap=Object.entries(apm).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([a,p])=>({area:a,pontos:p}));
+  const est=cd.reduce((a,c)=>{},[]); // fallback to embed for states
+  const anos=[2023,2024,2025,2026].map(y=>({ano:y,pontos:mth(y).reduce((a,b)=>a+b,0)})).filter(a=>a.pontos>0);
+  const str=cd.filter(c=>c.campanha.toLowerCase().includes('estrelas turbinadas')).slice(0,12);
+  return{
+    kpis,tl_labels:tlL,tl_credito:tlC,
+    monthly_2023:mth('2023'),monthly_2024:mth('2024'),monthly_2025:mth('2025'),monthly_2026:mth('2026'),
+    trim_labels:tLb,trim_vals:tV,regionais:rd,vendedores:vd,campanhas:cd,
+    campanhas_fin:fCT,areas_financeiro:fA,area_pontos:ap,
+    estados:EMBED.estados,cad_estado:EMBED.cad_estado,anos:anos,estrelas:str,
+    meses:EMBED.meses,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════════════════════════
+function renderAll(){
+  renderInsights();renderKPIs();
+  renderExecCharts();renderFinanceiro();renderCampanhas();
+  renderRegional();renderVendedores();renderTemporal();renderRanking();
+}
+
+// ─── INSIGHTS ────────────────────────────────────────────
+function renderInsights(){
+  const k=D.kpis;const r=D.regionais;const c=D.campanhas;
+  const items=[
+    `Regional líder: <b>${r[0]?.regional||'—'}</b> com <b>${fP(r[0]?.pontos||0)} pts</b>`,
+    `Campanha topo: <b>${(c[0]?.campanha||'—').slice(0,32)}</b>`,
+    `Engajamento geral: <b>${fN(k.engajamento_pct||0,2)}%</b> dos vendedores`,
+    `Total créditos: <b>${fP(k.total_credito||0)} pts</b> acumulados`,
+    `Vendedores ativos: <b>${fN(k.vendedores_ativos||0)}</b> no programa`,
+    `Total campanhas: <b>${fN(k.total_campanhas||0)}</b> cadastradas`,
+  ];
+  document.getElementById('insStr').innerHTML=items.map(t=>`<div class="insight">💡 ${t}</div>`).join('');
+}
+
+// ─── KPIs ─────────────────────────────────────────────────
+function bKPI(id,list){
+  document.getElementById(id).innerHTML=list.map(k=>`
+    <div class="kpi ${k.c||''}">
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val${k.sm?' sm':''}">${k.v}</div>
+      ${k.s?`<span class="kpi-delta ${k.up?'up':'dn'}">${k.up?'↑':'↓'} ${k.s}</span>`:''}
+    </div>`).join('');
+}
+
+function renderKPIs(){
+  const k=D.kpis;
+  const ta=k.total_atribuido||0;const tv=k.total_verba||0;
+  const va=k.vendedores_ativos||0;const tve=k.total_vendedores||0;
+  const tc=k.total_campanhas||0;const eng=k.engajamento_pct||0;
+  const roi=k.roi_pct||0;const con=k.contratos_sim||0;
+
+  bKPI('kpiExec',[
+    {l:'Atribuído a Usuários', v:fM(ta),     c:'green',s:`${fN(roi,2)}% da verba`,up:true},
+    {l:'Vendedores Ativos',    v:fN(va),     c:'',     s:`de ${fN(tve)} cadastrados`,up:true},
+    {l:'Total Campanhas',      v:fN(tc),     c:'blue', s:'campanhas no sistema',up:true},
+    {l:'Engajamento',          v:eng.toFixed(1)+'%',c:'green',s:'ativação real',up:true},
+  ]);
+  bKPI('kpiFin',[
+    {l:'Total Verba',          v:fM(tv),     c:'gold', s:'orçamento total',up:true},
+    {l:'Total Atribuído',      v:fM(ta),     c:'green',s:`${fN(roi,2)}% utilização`,up:true},
+    {l:'Saldo Disponível',     v:fM(tv-ta),  c:'cyan', s:'não atribuído',up:false},
+    {l:'Total Campanhas',      v:fN(tc),     c:'blue', s:'cadastradas',up:true},
+  ]);
+  bKPI('kpiCamp',[
+    {l:'Total Campanhas',      v:fN(tc),     c:'',     s:'no sistema',up:true},
+    {l:'Total Pontos Dist.',   v:fP(k.total_credito||0), c:'gold',s:'pts creditados',up:true},
+    {l:'Ticket Médio',         v:fP(k.ticket_medio||0), c:'cyan',sm:true,s:'pts/transação',up:true},
+    {l:'Participantes Únicos', v:fN(va),     c:'green',s:'CPFs distintos',up:true},
+  ]);
+  bKPI('kpiReg',[
+    {l:'Regionais Ativas',     v:'6',         c:'',    s:'regionais reais',up:true},
+    {l:'Maior Regional',       v:D.regionais[0]?.regional||'—', c:'gold',sm:true},
+    {l:'Total Cadastros',      v:fN(tve),     c:'cyan',s:'vendedores',up:true},
+    {l:'Contratos Assinados',  v:fN(con),     c:'green',s:`de ${fN(tve)}`,up:true},
+  ]);
+  bKPI('kpiVend',[
+    {l:'Top Vendedor',         v:(D.vendedores[0]?.nome||'—').split(' ').slice(0,2).join(' '), c:'gold',sm:true},
+    {l:'Pontos (1º lugar)',    v:fP(D.vendedores[0]?.pontos||0), c:'',s:'acumulado',up:true},
+    {l:'Ativos (pts > 0)',     v:fN(va),      c:'green',s:'no período',up:true},
+    {l:'Cadastros Totais',     v:fN(tve),     c:'cyan'},
+  ]);
+  bKPI('kpiTemp',[
+    {l:'Período',              v:'Fev/23–Mai/26', sm:true,c:''},
+    {l:'Pico Mensal',          v:fP(Math.max(...(D.tl_credito||[0]))), c:'gold',s:'maior mês',up:true},
+    {l:'Média Mensal',         v:fP((D.tl_credito||[0]).reduce((a,b)=>a+b,0)/Math.max(D.tl_credito.length,1)), c:'cyan'},
+    {l:'Meses com Dados',      v:String((D.tl_labels||[]).length), c:'green',s:'meses ativos',up:true},
+  ]);
+}
+
+// ─── CHARTS EXECUTIVO ─────────────────────────────────────
+function renderExecCharts(){
+  const {tl_labels,tl_credito,regionais,area_pontos,anos} = D;
+  mkC('chTL',{type:'line',data:{labels:tl_labels,datasets:[{label:'Pontos Creditados',data:tl_credito,borderColor:C.p2,backgroundColor:'rgba(124,58,237,.08)',fill:true,tension:.4,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxRotation:45,maxTicksLimit:20}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+  mkC('chRB',{type:'bar',data:{labels:regionais.map(r=>r.regional),datasets:[{label:'Pontos',data:regionais.map(r=>r.pontos),backgroundColor:regionais.map((_,i)=>C.pal[i]+'99'),borderColor:regionais.map((_,i)=>C.pal[i]),borderWidth:1,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+  mkC('chAD',{type:'doughnut',data:{labels:area_pontos.map(a=>a.area),datasets:[{data:area_pontos.map(a=>a.pontos),backgroundColor:C.pal.map(c=>c+'cc'),borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'right',labels:{color:'rgba(241,240,255,.6)',padding:10,boxWidth:10,font:{size:10}}}}}});
+  mkC('chYY',{type:'bar',data:{labels:anos.map(a=>String(a.ano)),datasets:[{label:'Total Pontos',data:anos.map(a=>a.pontos),backgroundColor:[C.p1+'aa',C.gold+'aa',C.cyan+'aa',C.green+'aa'],borderColor:[C.p1,C.gold,C.cyan,C.green],borderWidth:1,borderRadius:7}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────
+function renderFinanceiro(){
+  const {areas_financeiro,campanhas_fin}=D;
+  const t8=areas_financeiro.slice(0,8);
+  mkC('chFA',{type:'bar',data:{labels:t8.map(a=>a.area),datasets:[{label:'Verba Total',data:t8.map(a=>a.verba),backgroundColor:C.p1+'88',borderColor:C.p1,borderWidth:1,borderRadius:4},{label:'Atribuído',data:t8.map(a=>a.atribuido),backgroundColor:C.green+'88',borderColor:C.green,borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(241,240,255,.6)',boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{maxRotation:30}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fM(v)}}}}});
+  mkC('chUtil',{type:'bar',data:{labels:t8.map(a=>a.area),datasets:[{label:'Utilização (%)',data:t8.map(a=>a.verba>0?+(a.atribuido/a.verba*100).toFixed(2):0),backgroundColor:t8.map(a=>{const p=a.verba>0?a.atribuido/a.verba*100:0;return p>80?C.green+'aa':p>40?C.gold+'aa':C.red+'aa';}),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:30}},y:{grid:{color:'rgba(255,255,255,.04)'},max:100,ticks:{callback:v=>v+'%'}}}}});
+  document.getElementById('bFC').innerHTML=campanhas_fin.map((c,i)=>`<tr><td>${rkN(i)}</td><td class="td-n" title="${c.campanha}">${c.campanha.length>38?c.campanha.slice(0,38)+'…':c.campanha}</td><td>${c.area}</td><td class="td-v">${fM(c.verba)}</td><td class="td-v" style="color:${C.green}">${fM(c.atribuido)}</td><td>${pillS(c.status)}</td></tr>`).join('');
+}
+
+// ─── CAMPANHAS ────────────────────────────────────────────
+function renderCampanhas(){
+  const {campanhas,estrelas}=D;
+  const t20=campanhas.slice(0,20);
+  mkC('chTC',{type:'bar',data:{labels:t20.map(c=>c.campanha.length>28?c.campanha.slice(0,28)+'…':c.campanha),datasets:[{label:'Pontos',data:t20.map(c=>c.pontos),backgroundColor:t20.map((_,i)=>C.pal[i%C.pal.length]+'99'),borderColor:t20.map((_,i)=>C.pal[i%C.pal.length]),borderWidth:1,borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  mkC('chES',{type:'bar',data:{labels:estrelas.map(c=>c.campanha.replace(/CAMPANHA ESTRELAS TURBINADAS\s*/i,'').replace(/ESTRELAS TURBINADAS\s*/i,'')),datasets:[{label:'Pontos',data:estrelas.map(c=>c.pontos),backgroundColor:C.gold+'99',borderColor:C.gold,borderWidth:1,borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  cpg=1;renderCampTbl();
+}
+function renderCampTbl(){
+  const c=D.campanhas;const tot=c.length;const pgs=Math.ceil(tot/PSZ);
+  const sl=c.slice((cpg-1)*PSZ,cpg*PSZ);const off=(cpg-1)*PSZ;
+  document.getElementById('bAC').innerHTML=sl.map((r,i)=>`<tr><td>${off+i+1}</td><td class="td-n" title="${r.campanha}">${r.campanha.length>45?r.campanha.slice(0,45)+'…':r.campanha}</td><td class="td-p">${fP(r.pontos)}</td><td>${fN(r.participantes)}</td><td>${fN(r.transacoes)}</td></tr>`).join('');
+  document.getElementById('pagC').innerHTML=pgH('cpg',cpg,pgs,tot);
+}
+
+// ─── REGIONAL ─────────────────────────────────────────────
+function renderRegional(){
+  const {regionais,estados,cad_estado}=D;
+  const mx=Math.max(...regionais.map(r=>r.pontos));
+  document.getElementById('regCards').innerHTML=regionais.map(r=>`<div class="reg-card"><div class="reg-nm">${r.regional}</div><div class="reg-vl">${fP(r.pontos)}</div><div class="reg-mt"><span>${fN(r.ativos)} ativos</span><span>${fN(r.cadastros)} cad.</span></div>${pbar(r.pontos,mx,'')}</div>`).join('');
+  mkC('chEst',{type:'bar',data:{labels:estados.map(e=>e.estado),datasets:[{label:'Pontos',data:estados.map(e=>e.pontos),backgroundColor:estados.map((_,i)=>C.pal[i%C.pal.length]+'aa'),borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},y:{grid:{display:false}}}}});
+  mkC('chCE',{type:'bar',data:{labels:cad_estado.map(e=>e.estado),datasets:[{label:'Cadastros',data:cad_estado.map(e=>e.cadastros),backgroundColor:C.cyan+'88',borderColor:C.cyan,borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'}}}}}); 
+}
+
+// ─── VENDEDORES ───────────────────────────────────────────
+function renderVendedores(){vpg=1;renderVendTbl();}
+function renderVendTbl(){
+  const v=D.vendedores;const tot=v.length;const pgs=Math.ceil(tot/PSZ);
+  const sl=v.slice((vpg-1)*PSZ,vpg*PSZ);const mx=v[0]?.pontos||1;
+  document.getElementById('bVend').innerHTML=sl.map((r,i)=>`<tr><td>${rkN((vpg-1)*PSZ+i)}</td><td class="td-n">${r.nome}</td><td>${r.regional}</td><td>${r.estado}</td><td class="td-p">${fP(r.pontos)}</td><td>${pbar(r.pontos,mx,'')}</td></tr>`).join('');
+  document.getElementById('pagV').innerHTML=pgH('vpg',vpg,pgs,tot);
+}
+
+// ─── TEMPORAL ─────────────────────────────────────────────
+function renderTemporal(){
+  buildCmp();
+  mkC('chTLA',{type:'line',data:{labels:D.tl_labels,datasets:[{label:'Pontos',data:D.tl_credito,borderColor:C.p4,backgroundColor:'rgba(192,132,252,.07)',fill:true,tension:.4,pointRadius:1.5,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxRotation:45,maxTicksLimit:18}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+  mkC('chTrim',{type:'bar',data:{labels:D.trim_labels,datasets:[{label:'Pontos',data:D.trim_vals,backgroundColor:D.trim_labels.map((_,i)=>C.pal[i%C.pal.length]+'99'),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:45}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+}
+function buildCmp(){
+  const ds=[];const cf={'2023':{color:C.cyan},'2024':{color:C.gold},'2025':{color:C.p4}};
+  Object.entries(cf).forEach(([y,c])=>{if(visY[y])ds.push({label:y,data:D['monthly_'+y]||Array(12).fill(0),borderColor:c.color,backgroundColor:c.color+'15',fill:false,tension:.4,pointRadius:3,borderWidth:2});});
+  mkC('chCmp',{type:'line',data:{labels:D.meses,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(241,240,255,.6)',boxWidth:12,padding:14}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}}}});
+}
+function tgY(yr,btn){visY[yr]=!visY[yr];btn.classList.toggle('active',visY[yr]);buildCmp();}
+
+// ─── RANKING ──────────────────────────────────────────────
+function renderRanking(){
+  const {vendedores:v,regionais:r,campanhas:c}=D;
+  const mxR=r[0]?.pontos||1;
+  document.getElementById('rkV').innerHTML=v.slice(0,20).map((x,i)=>`<tr><td>${rkN(i)}</td><td class="td-n">${x.nome}</td><td style="font-size:11px;color:var(--txt3)">${x.regional}</td><td class="td-p">${fP(x.pontos)}</td></tr>`).join('');
+  document.getElementById('rkR').innerHTML=r.map((x,i)=>`<tr><td>${rkN(i)}</td><td class="td-n">${x.regional}</td><td class="td-p">${fP(x.pontos)}</td><td>${fN(x.ativos)}</td><td>${pbar(x.pontos,mxR,'')}</td></tr>`).join('');
+  document.getElementById('rkC').innerHTML=c.slice(0,10).map((x,i)=>`<tr><td>${rkN(i)}</td><td class="td-n" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.campanha}">${x.campanha.length>35?x.campanha.slice(0,35)+'…':x.campanha}</td><td class="td-p">${fP(x.pontos)}</td></tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PAGINATION
+// ═══════════════════════════════════════════════════════════
+function pgH(vn,cur,tot,cnt){
+  if(tot<=1)return'';
+  return`<button class="pag-btn" onclick="chPg('${vn}',-1)" ${cur<=1?'disabled':''}>‹ Anterior</button><span class="pag-info">Pág ${cur}/${tot} · ${fN(cnt)} reg.</span><button class="pag-btn" onclick="chPg('${vn}',1)" ${cur>=tot?'disabled':''}>Próxima ›</button>`;
+}
+function chPg(vn,d){if(vn==='cpg'){cpg+=d;renderCampTbl();}if(vn==='vpg'){vpg+=d;renderVendTbl();}window.scrollTo({top:0,behavior:'smooth'});}
+
+// ═══════════════════════════════════════════════════════════
+//  TABLE UTILS
+// ═══════════════════════════════════════════════════════════
+const sState={};
+function sT(tid,ci){
+  const tb=document.getElementById(tid);if(!tb)return;
+  const rows=Array.from(tb.querySelector('tbody').querySelectorAll('tr'));
+  const k=tid+'_'+ci;sState[k]=!sState[k];const asc=sState[k];
+  rows.sort((a,b)=>{const av=a.cells[ci]?.innerText.trim()||'';const bv=b.cells[ci]?.innerText.trim()||'';const an=parseFloat(av.replace(/[^0-9.,]/g,'').replace(',','.'));const bn=parseFloat(bv.replace(/[^0-9.,]/g,'').replace(',','.'));if(!isNaN(an)&&!isNaN(bn))return asc?an-bn:bn-an;return asc?av.localeCompare(bv,'pt-BR'):bv.localeCompare(av,'pt-BR');});
+  rows.forEach(r=>tb.querySelector('tbody').appendChild(r));
+}
+function fTbl(bid,q){document.getElementById(bid)?.querySelectorAll('tr').forEach(r=>{r.style.display=r.innerText.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+
+// ═══════════════════════════════════════════════════════════
+//  EXPORT CSV
+// ═══════════════════════════════════════════════════════════
+function exportCSV(){
+  if(!D)return;
+  const h=['Rank','Vendedor','Regional','Estado','Pontos'];
+  const rows=D.vendedores.map(v=>[v.rank,v.nome,v.regional,v.estado,v.pontos]);
+  const csv=[h,...rows].map(r=>r.join(';')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='incentivale_vendedores.csv';a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    const page=item.dataset.page;
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('pg-'+page)?.classList.add('active');
+    document.getElementById('pgTitle').textContent=PAGES[page]||page;
+    document.getElementById('pgSub').textContent=SUBS[page]||'';
+    if(window.innerWidth<=768)closeSB();
+  });
+});
+document.getElementById('mobTgl').addEventListener('click',()=>{
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('ovl').classList.add('open');
+});
+function closeSB(){document.getElementById('sidebar').classList.remove('open');document.getElementById('ovl').classList.remove('open');}
+
+// ═══════════════════════════════════════════════════════════
+//  HIDE LOADER
+// ═══════════════════════════════════════════════════════════
+function hideLoader(){setTimeout(()=>document.getElementById('loadScreen').classList.add('hidden'),500);}
+
+// ═══════════════════════════════════════════════════════════
+//  START
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',init);
+</script></body></html>
