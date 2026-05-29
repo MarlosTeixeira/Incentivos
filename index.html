@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incentivale · Analytics Dashboard</title>
+
+<!-- SheetJS para leitura do XLSX -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────── */
+:root{
+  --bg:#0c0918;--bg2:#110e22;--bg3:#1a1535;
+  --card:rgba(255,255,255,.04);--card-h:rgba(255,255,255,.07);
+  --border:rgba(255,255,255,.07);--border-p:rgba(139,92,246,.35);
+  --p1:#7c3aed;--p2:#8b5cf6;--p3:#a78bfa;--p4:#c084fc;--p5:#e9d5ff;
+  --gold:#f59e0b;--cyan:#22d3ee;--green:#10b981;--red:#f43f5e;--blue:#3b82f6;
+  --txt:#f1f0ff;--txt2:rgba(241,240,255,.6);--txt3:rgba(241,240,255,.35);
+  --r:14px;--r2:10px;--r3:6px;
+  --shadow:0 0 40px rgba(124,58,237,.18);
+  --ff:'Syne',sans-serif;--fb:'DM Sans',sans-serif;
+  --sidebar:240px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--txt);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%,rgba(124,58,237,.13) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 60% at 85% 85%,rgba(76,29,149,.16) 0%,transparent 60%),
+    radial-gradient(ellipse 35% 35% at 50% 45%,rgba(192,132,252,.05) 0%,transparent 70%);
+}
+
+/* ─── LOADING SCREEN ────────────────────────────────────── */
+#loadScreen{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+  transition:opacity .5s ease;
+}
+#loadScreen.hidden{opacity:0;pointer-events:none;}
+.load-logo{font-family:var(--ff);font-size:28px;font-weight:800;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.load-sub{font-size:12px;color:var(--txt3);letter-spacing:3px;text-transform:uppercase;}
+.load-bar-wrap{width:260px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+.load-bar{height:100%;background:linear-gradient(90deg,var(--p1),var(--p4));border-radius:2px;
+  animation:loadAnim 2s ease forwards;}
+@keyframes loadAnim{from{width:0}to{width:100%}}
+.load-status{font-size:12px;color:var(--txt3);}
+
+/* ─── SIDEBAR ───────────────────────────────────────────── */
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:var(--sidebar);
+  background:rgba(12,9,24,.97);border-right:1px solid var(--border);
+  backdrop-filter:blur(20px);z-index:100;
+  display:flex;flex-direction:column;padding:24px 0;
+  transition:transform .3s ease;
+}
+.logo{padding:0 22px 24px;border-bottom:1px solid var(--border);}
+.logo-mark{display:flex;align-items:center;gap:10px;margin-bottom:2px;}
+.logo-icon{
+  width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--p1),var(--p4));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.logo-text{font-family:var(--ff);font-weight:800;font-size:17px;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-sub{font-size:10px;color:var(--txt3);letter-spacing:2.5px;text-transform:uppercase;margin-top:2px;}
+
+.nav{flex:1;padding:18px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.nav-label{font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--txt3);
+  padding:12px 12px 5px;font-weight:600;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r2);
+  cursor:pointer;color:var(--txt2);font-size:13px;font-weight:500;
+  border:1px solid transparent;transition:all .18s;user-select:none;
+}
+.nav-item:hover{background:var(--card-h);color:var(--txt);border-color:var(--border);}
+.nav-item.active{background:rgba(124,58,237,.15);color:var(--p3);border-color:rgba(124,58,237,.28);}
+.nav-ico{font-size:14px;width:17px;text-align:center;flex-shrink:0;}
+.nav-badge{
+  margin-left:auto;font-size:10px;font-weight:700;
+  background:rgba(124,58,237,.2);color:var(--p3);
+  padding:2px 6px;border-radius:10px;
+}
+
+.sidebar-footer{padding:16px 22px;border-top:1px solid var(--border);}
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.22);
+  color:#10b981;font-size:11px;padding:5px 11px;border-radius:20px;font-weight:500;
+}
+.live-dot{width:6px;height:6px;background:#10b981;border-radius:50%;
+  animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.4);}}
+.update-info{font-size:10px;color:var(--txt3);margin-top:8px;line-height:1.5;}
+
+/* ─── MAIN ──────────────────────────────────────────────── */
+.main{margin-left:var(--sidebar);min-height:100vh;position:relative;z-index:1;}
+
+/* ─── TOPBAR ────────────────────────────────────────────── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;border-bottom:1px solid var(--border);
+  background:rgba(12,9,24,.85);backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:50;
+}
+.page-info .page-title{font-family:var(--ff);font-size:18px;font-weight:700;}
+.page-info .page-sub{font-size:11px;color:var(--txt3);margin-top:2px;}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+.filter-sel{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--txt2);font-family:var(--fb);font-size:12.5px;padding:7px 12px;
+  cursor:pointer;outline:none;transition:all .18s;
+}
+.filter-sel:hover,.filter-sel:focus{border-color:var(--border-p);color:var(--txt);}
+
+.btn{
+  font-family:var(--fb);font-size:12.5px;font-weight:600;
+  padding:7px 15px;border-radius:var(--r2);cursor:pointer;
+  border:1px solid;transition:all .2s;
+}
+.btn-purple{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:var(--p3);}
+.btn-purple:hover{background:rgba(124,58,237,.25);box-shadow:0 0 18px rgba(124,58,237,.25);}
+.btn-ghost{background:transparent;border-color:var(--border);color:var(--txt2);}
+.btn-ghost:hover{background:var(--card-h);color:var(--txt);}
+
+/* ─── CONTENT ───────────────────────────────────────────── */
+.content{padding:24px 28px;}
+
+/* ─── PAGE SECTIONS ─────────────────────────────────────── */
+.pg{display:none;animation:fadeUp .35s ease;}
+.pg.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+/* ─── KPI GRID ──────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px;margin-bottom:22px;}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;position:relative;overflow:hidden;cursor:default;
+  transition:transform .25s,box-shadow .25s,border-color .25s;
+}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-accent,linear-gradient(90deg,var(--p1),var(--p4)));}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--border-p);}
+.kpi.gold{--kpi-accent:linear-gradient(90deg,#f59e0b,#fcd34d);}
+.kpi.cyan{--kpi-accent:linear-gradient(90deg,#22d3ee,#67e8f9);}
+.kpi.green{--kpi-accent:linear-gradient(90deg,#10b981,#34d399);}
+.kpi.red{--kpi-accent:linear-gradient(90deg,#f43f5e,#fb7185);}
+.kpi.blue{--kpi-accent:linear-gradient(90deg,#3b82f6,#93c5fd);}
+.kpi-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3);font-weight:600;margin-bottom:8px;}
+.kpi-val{font-family:var(--ff);font-size:24px;font-weight:800;color:var(--txt);line-height:1;margin-bottom:7px;}
+.kpi-val.sm{font-size:19px;}
+.kpi-delta{
+  display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;
+  padding:2px 8px;border-radius:20px;
+}
+.up{background:rgba(16,185,129,.12);color:#10b981;}
+.dn{background:rgba(244,63,94,.12);color:#f43f5e;}
+
+/* ─── CHART GRID ────────────────────────────────────────── */
+.row{display:grid;gap:18px;margin-bottom:18px;}
+.row-2{grid-template-columns:1fr 1fr;}
+.row-3{grid-template-columns:2fr 1fr;}
+.row-32{grid-template-columns:1fr 2fr;}
+.row-1{grid-template-columns:1fr;}
+
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:22px;transition:border-color .25s;
+}
+.card:hover{border-color:var(--border-p);}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.card-title{font-family:var(--ff);font-size:14px;font-weight:700;color:var(--txt);}
+.card-sub{font-size:11px;color:var(--txt3);margin-top:3px;}
+.badge{
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;
+  background:rgba(124,58,237,.12);color:var(--p3);border:1px solid rgba(124,58,237,.2);
+}
+.badge.gold{background:rgba(245,158,11,.12);color:#f59e0b;border-color:rgba(245,158,11,.2);}
+.badge.green{background:rgba(16,185,129,.12);color:#10b981;border-color:rgba(16,185,129,.2);}
+.badge.red{background:rgba(244,63,94,.12);color:#f43f5e;border-color:rgba(244,63,94,.2);}
+
+/* ─── TABLE ─────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;}
+.tbl-tools{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+.search-input{
+  background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--txt2);font-family:var(--fb);font-size:12.5px;padding:7px 13px;outline:none;
+  width:200px;transition:all .18s;
+}
+.search-input:focus{border-color:var(--border-p);color:var(--txt);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  padding:9px 13px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--txt3);font-weight:700;border-bottom:1px solid var(--border);text-align:left;
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+thead th:hover{color:var(--p3);}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .14s;}
+tbody tr:hover{background:rgba(255,255,255,.03);}
+tbody td{padding:10px 13px;color:var(--txt2);vertical-align:middle;}
+tbody td:first-child{color:var(--txt);}
+.td-name{font-weight:600;color:var(--txt);}
+.td-pts{font-family:var(--ff);font-weight:700;color:var(--p3);font-size:13.5px;}
+.td-val{font-family:var(--ff);font-weight:700;color:var(--gold);}
+
+.rank-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:7px;font-weight:800;font-size:11px;
+}
+.r1{background:rgba(245,158,11,.2);color:#f59e0b;}
+.r2{background:rgba(148,163,184,.15);color:#94a3b8;}
+.r3{background:rgba(180,83,9,.2);color:#d97706;}
+.rn{background:rgba(255,255,255,.06);color:var(--txt3);}
+
+.pbar-wrap{display:flex;align-items:center;gap:8px;min-width:120px;}
+.pbar{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+.pfill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--p1),var(--p4));transition:width 1.2s ease;}
+.pfill.g{background:linear-gradient(90deg,#10b981,#34d399);}
+.pfill.gold{background:linear-gradient(90deg,#f59e0b,#fcd34d);}
+.pfill.cyan{background:linear-gradient(90deg,#22d3ee,#67e8f9);}
+.pval{font-size:11px;color:var(--txt3);min-width:34px;text-align:right;}
+
+.pill{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;
+}
+.pill-on{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2);}
+.pill-off{background:rgba(244,63,94,.1);color:#f43f5e;border:1px solid rgba(244,63,94,.2);}
+
+/* ─── REGIONAL CARDS ─────────────────────────────────────── */
+.reg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.reg-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--r2);
+  padding:14px 16px;cursor:pointer;transition:all .2s;
+}
+.reg-card:hover{background:rgba(124,58,237,.08);border-color:var(--border-p);}
+.reg-name{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3);font-weight:700;margin-bottom:6px;}
+.reg-val{font-family:var(--ff);font-size:20px;font-weight:800;color:var(--p3);}
+.reg-meta{font-size:11px;color:var(--txt3);margin-top:4px;display:flex;gap:10px;}
+.reg-meta span{color:var(--txt2);}
+
+/* ─── INSIGHT STRIP ─────────────────────────────────────── */
+.insights{display:flex;gap:10px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px;}
+.insight{
+  flex-shrink:0;background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.18);
+  border-radius:20px;padding:7px 14px;font-size:12px;color:var(--txt2);
+  display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.insight b{color:var(--p4);}
+
+/* ─── YEAR TABS ──────────────────────────────────────────── */
+.ytabs{display:flex;gap:4px;margin-bottom:16px;}
+.ytab{
+  font-size:12px;font-weight:600;padding:6px 14px;border-radius:var(--r2);
+  cursor:pointer;color:var(--txt2);border:1px solid var(--border);background:transparent;
+  transition:all .18s;
+}
+.ytab.active{background:rgba(124,58,237,.18);color:var(--p3);border-color:var(--border-p);}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(124,58,237,.3);border-radius:2px;}
+
+/* ─── MOBILE TOGGLE ──────────────────────────────────────── */
+.mob-toggle{
+  display:none;position:fixed;top:14px;left:14px;z-index:200;
+  background:var(--p1);border:none;border-radius:10px;color:#fff;
+  width:38px;height:38px;font-size:17px;cursor:pointer;
+  align-items:center;justify-content:center;
+}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
+
+/* ─── PAGINATION ─────────────────────────────────────────── */
+.pag{display:flex;align-items:center;gap:8px;margin-top:14px;justify-content:flex-end;}
+.pag-btn{
+  background:var(--card);border:1px solid var(--border);color:var(--txt2);
+  font-family:var(--fb);font-size:12px;padding:5px 11px;border-radius:var(--r3);
+  cursor:pointer;transition:all .15s;
+}
+.pag-btn:hover:not(:disabled){background:var(--card-h);border-color:var(--border-p);color:var(--p3);}
+.pag-btn:disabled{opacity:.35;cursor:default;}
+.pag-info{font-size:11px;color:var(--txt3);}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────── */
+@media(max-width:1080px){.row-2,.row-3,.row-32{grid-template-columns:1fr;}.reg-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .overlay.open{display:block;}
+  .main{margin-left:0;}
+  .mob-toggle{display:flex;}
+  .content{padding:16px 14px;}
+  .topbar{padding:12px 14px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .topbar-right{display:none;}
+  .reg-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadScreen">
+  <div class="load-logo">Incentivale</div>
+  <div class="load-sub">Analytics Dashboard</div>
+  <div class="load-bar-wrap"><div class="load-bar"></div></div>
+  <div class="load-status" id="loadStatus">Carregando dashboard_unico.xlsx…</div>
+</div>
+
+<button class="mob-toggle" id="mobToggle">☰</button>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-mark">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">Incentivale</div>
+    </div>
+    <div class="logo-sub">Analytics Hub</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-label">Visões</div>
+    <div class="nav-item active" data-page="executivo">
+      <span class="nav-ico">◈</span> Executivo
+    </div>
+    <div class="nav-item" data-page="financeiro">
+      <span class="nav-ico">◉</span> Financeiro
+    </div>
+    <div class="nav-item" data-page="campanhas">
+      <span class="nav-ico">◎</span> Campanhas
+    </div>
+    <div class="nav-item" data-page="regional">
+      <span class="nav-ico">◐</span> Regional
+    </div>
+    <div class="nav-item" data-page="vendedores">
+      <span class="nav-ico">◑</span> Vendedores
+    </div>
+    <div class="nav-label">Analytics</div>
+    <div class="nav-item" data-page="temporal">
+      <span class="nav-ico">▲</span> Temporal
+    </div>
+    <div class="nav-item" data-page="ranking">
+      <span class="nav-ico">◆</span> Ranking
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="live-badge"><span class="live-dot"></span> Dados do XLSX</div>
+    <div class="update-info">Para atualizar: substitua o<br><b>dashboard_unico.xlsx</b></div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div class="page-info">
+      <div class="page-title" id="pgTitle">Visão Executiva</div>
+      <div class="page-sub" id="pgSub">Carregando dados…</div>
+    </div>
+    <div class="topbar-right">
+      <select class="filter-sel" id="fAno">
+        <option value="todos">Todos os Anos</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+      </select>
+      <select class="filter-sel" id="fRegional">
+        <option value="todos">Todas Regionais</option>
+        <option value="SUL">SUL</option>
+        <option value="NNE">NNE</option>
+        <option value="RIO">RIO</option>
+        <option value="CTO">CTO</option>
+        <option value="SPR">SPR</option>
+        <option value="SPC">SPC</option>
+      </select>
+      <button class="btn btn-purple" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-ghost" onclick="reloadXLSX()">↺ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ═══ EXECUTIVO ══════════════════════════════════════ -->
+    <div class="pg active" id="pg-executivo">
+      <div class="insights" id="insightsStrip"></div>
+      <div class="kpi-grid" id="kpiExec"></div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Pontos Creditados — Evolução Mensal</div>
+              <div class="card-sub">Série histórica completa 2023–2026</div></div>
+            <div class="badge">Timeline</div>
+          </div>
+          <canvas id="chTimeline" height="200"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Pontos por Regional</div>
+              <div class="card-sub">Distribuição total acumulada</div></div>
+            <div class="badge gold">Regional</div>
+          </div>
+          <canvas id="chRegBar" height="200"></canvas>
+        </div>
+      </div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Pontos por Área de Negócio</div>
+              <div class="card-sub">Distribuição por área (base real)</div></div>
+            <div class="badge">Área</div>
+          </div>
+          <canvas id="chAreaDono" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Pontos por Ano</div>
+              <div class="card-sub">Comparativo anual acumulado</div></div>
+            <div class="badge green">YoY</div>
+          </div>
+          <canvas id="chAnual" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ FINANCEIRO ═════════════════════════════════════ -->
+    <div class="pg" id="pg-financeiro">
+      <div class="kpi-grid" id="kpiFin"></div>
+      <div class="row row-1">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Verba vs Atribuído por Área</div>
+              <div class="card-sub">Comparativo financeiro — todas as áreas</div></div>
+            <div class="badge gold">Financeiro</div>
+          </div>
+          <canvas id="chFinArea" height="220"></canvas>
+        </div>
+      </div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">% Utilização da Verba por Área</div>
+              <div class="card-sub">Atribuído ÷ Verba × 100</div></div>
+          </div>
+          <canvas id="chUtilizacao" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Top Campanhas — Maior Verba</div>
+              <div class="card-sub">15 campanhas com maior orçamento</div></div>
+          </div>
+          <div class="tbl-wrap">
+            <table id="tblFinCamp">
+              <thead><tr>
+                <th>#</th><th onclick="sortTable('tblFinCamp',1)">Campanha ↕</th>
+                <th onclick="sortTable('tblFinCamp',2)">Área ↕</th>
+                <th onclick="sortTable('tblFinCamp',3)">Verba ↕</th>
+                <th onclick="sortTable('tblFinCamp',4)">Atribuído ↕</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody id="bodyFinCamp"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CAMPANHAS ══════════════════════════════════════ -->
+    <div class="pg" id="pg-campanhas">
+      <div class="kpi-grid" id="kpiCamp"></div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Top 20 Campanhas — Volume de Pontos</div>
+              <div class="card-sub">Maior distribuição de pontos (base real)</div></div>
+          </div>
+          <canvas id="chTopCamp" height="300"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Campanhas 2025 — Estrelas Turbinadas</div>
+              <div class="card-sub">Série mensal — campanha recorrente</div></div>
+          </div>
+          <canvas id="chEstrelas" height="300"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tbl-tools">
+          <div class="card-title">Todas as Campanhas (Pontos)</div>
+          <input class="search-input" type="text" placeholder="Buscar campanha…" oninput="filterTbl('bodyAllCamp',this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table id="tblAllCamp">
+            <thead><tr>
+              <th>#</th>
+              <th onclick="sortTable('tblAllCamp',1)">Campanha ↕</th>
+              <th onclick="sortTable('tblAllCamp',2)">Pontos ↕</th>
+              <th onclick="sortTable('tblAllCamp',3)">Participantes ↕</th>
+              <th onclick="sortTable('tblAllCamp',4)">Transações ↕</th>
+            </tr></thead>
+            <tbody id="bodyAllCamp"></tbody>
+          </table>
+        </div>
+        <div class="pag" id="pagCamp"></div>
+      </div>
+    </div>
+
+    <!-- ═══ REGIONAL ═══════════════════════════════════════ -->
+    <div class="pg" id="pg-regional">
+      <div class="kpi-grid" id="kpiReg"></div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Comparativo Regional</div>
+              <div class="card-sub">Pontos, Ativos e Cadastros</div></div>
+          </div>
+          <div class="reg-grid" id="regCards"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Pontos por Estado (Top 10)</div>
+              <div class="card-sub">Distribuição geográfica acumulada</div></div>
+            <div class="badge">Estado</div>
+          </div>
+          <canvas id="chEstado" height="260"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">Cadastros por Estado (Top 10)</div>
+            <div class="card-sub">Base de vendedores por UF</div></div>
+        </div>
+        <canvas id="chCadEstado" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- ═══ VENDEDORES ═════════════════════════════════════ -->
+    <div class="pg" id="pg-vendedores">
+      <div class="kpi-grid" id="kpiVend"></div>
+      <div class="card">
+        <div class="tbl-tools">
+          <div class="card-title">Top 50 Vendedores — Volume de Pontos</div>
+          <input class="search-input" type="text" placeholder="Buscar vendedor…" oninput="filterTbl('bodyVend',this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table id="tblVend">
+            <thead><tr>
+              <th>Rank</th>
+              <th onclick="sortTable('tblVend',1)">Vendedor ↕</th>
+              <th onclick="sortTable('tblVend',2)">Regional ↕</th>
+              <th onclick="sortTable('tblVend',3)">Estado ↕</th>
+              <th onclick="sortTable('tblVend',4)">Pontos ↕</th>
+              <th>Participação</th>
+            </tr></thead>
+            <tbody id="bodyVend"></tbody>
+          </table>
+        </div>
+        <div class="pag" id="pagVend"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TEMPORAL ═══════════════════════════════════════ -->
+    <div class="pg" id="pg-temporal">
+      <div class="kpi-grid" id="kpiTemp"></div>
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head">
+          <div><div class="card-title">Evolução Mensal — Comparativo por Ano</div>
+            <div class="card-sub">2023 vs 2024 vs 2025 — Pontos creditados por mês</div></div>
+          <div class="badge">Comparativo</div>
+        </div>
+        <div class="ytabs">
+          <button class="ytab active" onclick="toggleYear('2023',this)">2023</button>
+          <button class="ytab active" onclick="toggleYear('2024',this)">2024</button>
+          <button class="ytab active" onclick="toggleYear('2025',this)">2025</button>
+        </div>
+        <canvas id="chComparativo" height="220"></canvas>
+      </div>
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Timeline Completa 2023–2026</div>
+              <div class="card-sub">Série histórica acumulada de pontos</div></div>
+          </div>
+          <canvas id="chTimelineAll" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Volume por Trimestre</div>
+              <div class="card-sub">Sazonalidade trimestral acumulada</div></div>
+          </div>
+          <canvas id="chTrimestral" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RANKING ════════════════════════════════════════ -->
+    <div class="pg" id="pg-ranking">
+      <div class="row row-2">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">🏆 Top 20 Vendedores</div>
+              <div class="card-sub">Por volume total de pontos</div></div>
+          </div>
+          <div class="tbl-wrap">
+            <table><thead><tr>
+              <th>#</th><th>Vendedor</th><th>Regional</th><th>Pontos</th>
+            </tr></thead>
+            <tbody id="rankVend20"></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">🏆 Ranking Regional</div>
+              <div class="card-sub">Pontos por regional — posição</div></div>
+          </div>
+          <div class="tbl-wrap">
+            <table><thead><tr>
+              <th>#</th><th>Regional</th><th>Pontos</th><th>Ativos</th><th>Participação</th>
+            </tr></thead>
+            <tbody id="rankReg"></tbody></table>
+          </div>
+          <div class="card-head" style="margin-top:24px">
+            <div><div class="card-title">🏆 Top Campanhas</div>
+              <div class="card-sub">Por volume de pontos distribuídos</div></div>
+          </div>
+          <div class="tbl-wrap">
+            <table><thead><tr>
+              <th>#</th><th>Campanha</th><th>Pontos</th>
+            </tr></thead>
+            <tbody id="rankCamp10"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════
+const PAGES = {
+  executivo:  'Visão Executiva',
+  financeiro: 'Painel Financeiro',
+  campanhas:  'Campanhas',
+  regional:   'Análise Regional',
+  vendedores: 'Vendedores',
+  temporal:   'Análise Temporal',
+  ranking:    'Ranking',
+};
+const SUBS = {
+  executivo:  'Consolidado real — Fev/2023 a Mai/2026',
+  financeiro: 'Verba, Atribuição e Saldo por Área/Campanha',
+  campanhas:  'Performance e volume de campanhas reais',
+  regional:   'Distribuição geográfica de pontos',
+  vendedores: 'Top 50 vendedores por pontos acumulados',
+  temporal:   'Evolução mensal e comparativa de pontos',
+  ranking:    'Top performers por dimensão',
+};
+
+let D = null;           // dados carregados do XLSX
+let charts = {};        // instâncias Chart.js
+let visibleYears = {'2023':true,'2024':true,'2025':true};
+let campPage = 1, vendPage = 1;
+const PAGE_SZ = 25;
+
+// ═══════════════════════════════════════════════════════════
+//  CHART DEFAULTS
+// ═══════════════════════════════════════════════════════════
+Chart.defaults.color = 'rgba(241,240,255,.45)';
+Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.font.family = "'DM Sans',sans-serif";
+Chart.defaults.font.size = 11;
+
+const C = {
+  p1:'#7c3aed', p2:'#8b5cf6', p3:'#a78bfa', p4:'#c084fc',
+  gold:'#f59e0b', cyan:'#22d3ee', green:'#10b981', red:'#f43f5e', blue:'#3b82f6',
+  orange:'#f97316', pink:'#ec4899',
+  pal:['#7c3aed','#f59e0b','#22d3ee','#10b981','#f43f5e','#3b82f6','#ec4899','#f97316','#a78bfa','#34d399'],
+};
+
+function mkChart(id, cfg){
+  const el = document.getElementById(id);
+  if(!el) return null;
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el, cfg);
+  return charts[id];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LEITURA DO XLSX — SheetJS
+// ═══════════════════════════════════════════════════════════
+async function loadXLSX(){
+  setStatus('Buscando dashboard_unico.xlsx…');
+  let wb;
+  try {
+    const res = await fetch('dashboard_unico.xlsx');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ab = await res.arrayBuffer();
+    setStatus('Processando planilhas…');
+    wb = XLSX.read(ab, {type:'array', cellDates:true});
+  } catch(e){
+    setStatus('Erro ao carregar XLSX: '+e.message);
+    console.error(e);
+    setTimeout(()=>{ document.getElementById('loadScreen').classList.add('hidden'); },3000);
+    return;
+  }
+
+  setStatus('Processando KPIs e agregações…');
+  D = processWorkbook(wb);
+  setStatus('Renderizando dashboard…');
+  await new Promise(r=>setTimeout(r,200));
+  renderAll();
+  hideLoader();
+}
+
+function setStatus(msg){ document.getElementById('loadStatus').textContent = msg; }
+
+function parseNum(v){
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return v;
+  return parseFloat(String(v).replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.')) || 0;
+}
+
+function processWorkbook(wb){
+  // helper: sheet to array of objects
+  const toArr = (name) => {
+    const sh = wb.Sheets[name];
+    if(!sh) return [];
+    return XLSX.utils.sheet_to_json(sh, {defval:''});
+  };
+
+  const kpisRaw   = toArr('KPIs');
+  const timeline  = toArr('Timeline');
+  const regionais = toArr('Regionais');
+  const rankings  = toArr('Rankings');
+  const campanhas = toArr('Campanhas');
+  const finArea   = toArr('Financeiro_Area');
+  const financeiro= toArr('Financeiro');
+  const cadastro  = toArr('Cadastro');
+  const calendario= toArr('Calendario');
+
+  // KPIs dict
+  const kpis = {};
+  kpisRaw.forEach(r=>{ kpis[r.KPI] = r.Valor; });
+
+  // Timeline: labels e series
+  const tlLabels = timeline.map(r=>String(r.AnoMes||r['AnoMes']));
+  const tlCredito= timeline.map(r=>parseNum(r.Pontos_Credito));
+  const tlDebito = timeline.map(r=>parseNum(r.Pontos_Debito));
+
+  // Mensal por ano para comparativo
+  const byYearMonth = {};
+  timeline.forEach(r=>{
+    const ym = String(r.AnoMes);
+    const [y,m] = ym.split('-');
+    if(!byYearMonth[y]) byYearMonth[y]={};
+    byYearMonth[y][parseInt(m)] = parseNum(r.Pontos_Credito);
+  });
+  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const monthly = {};
+  ['2023','2024','2025','2026'].forEach(y=>{
+    monthly[y] = Array.from({length:12},(_,i)=>(byYearMonth[y]||{})[i+1]||0);
+  });
+
+  // Trimestral
+  const trimMap = {};
+  calendario.forEach(r=>{
+    const key = `${r.Ano} T${r.Trim}`;
+    trimMap[key]=(trimMap[key]||0)+parseNum(r.Pontos||r.pontos);
+  });
+  const trimLabels = Object.keys(trimMap).sort();
+  const trimVals   = trimLabels.map(k=>trimMap[k]);
+
+  // Regionais
+  const regData = regionais.map(r=>({
+    regional: r.Regional_Nome||r.regional||r.Regional,
+    pontos:   parseNum(r.Pontos_Total||r.pontos),
+    ativos:   parseNum(r.Vendedores||r.ativos),
+    cadastros:parseNum(r.Cadastros||r.cadastros),
+  })).filter(r=>r.regional&&r.pontos>0)
+     .sort((a,b)=>b.pontos-a.pontos);
+
+  // Vendedores top50
+  const vendData = rankings.map((r,i)=>({
+    rank:    parseNum(r.Rank||i+1),
+    nome:    r.Nome||r.nome||'N/D',
+    regional:r.Regional_Nome||r.Regional||r.regional||'N/D',
+    estado:  r['Estado / Entrega']||r.estado||'',
+    pontos:  parseNum(r.Pontos||r.pontos),
+  })).filter(r=>r.pontos>0)
+     .sort((a,b)=>a.rank-b.rank);
+
+  // Campanhas
+  const campData = campanhas.map(r=>({
+    campanha:    r.Campanha||r.campanha||'',
+    pontos:      parseNum(r.Pontos||r.pontos),
+    participantes:parseNum(r.Participantes||r.participantes),
+    transacoes:  parseNum(r.Transacoes||r.transacoes),
+    area:        r.Area||r.area||'',
+    status:      r.Status||r.status||'ATIVO',
+    verba:       parseNum(r.Verba||r.verba),
+    atribuido:   parseNum(r.Atribuido||r.atribuido),
+  })).filter(r=>r.campanha&&r.pontos>0)
+     .sort((a,b)=>b.pontos-a.pontos);
+
+  // Financeiro por area
+  const finAreaData = finArea.map(r=>({
+    area:      r.Area||r.area,
+    verba:     parseNum(r.Verba||r.verba),
+    atribuido: parseNum(r.Atribuido||r.atribuido),
+    saldo:     parseNum(r.Saldo||r.saldo),
+    campanhas: parseNum(r.Campanhas||r.campanhas),
+    util:      parseNum(r.Utilizacao_pct||r.util),
+  })).filter(r=>r.area&&r.verba>0)
+     .sort((a,b)=>b.verba-a.verba);
+
+  // Top15 campanhas financeiro (maior verba)
+  const finCampTop = [...financeiro]
+    .map(r=>({
+      campanha: r.Campanha||r.campanha,
+      area:     r.Area||r.area,
+      status:   r.Ativa||r.status||'ATIVO',
+      verba:    parseNum(r.Verba||r.verba),
+      atribuido:parseNum(r.Atribuido||r.atribuido),
+      saldo:    parseNum(r.Saldo||r.saldo),
+    }))
+    .filter(r=>r.campanha&&r.verba>0)
+    .sort((a,b)=>b.verba-a.verba)
+    .slice(0,15);
+
+  // Estados — montar dos dados de pontos/cadastro disponíveis
+  const estPtsMap={};
+  vendData.forEach(v=>{
+    estPtsMap[v.estado]=(estPtsMap[v.estado]||0)+v.pontos;
+  });
+  // usar valores reais do cadastro
+  const cadEstMap={};
+  cadastro.forEach(r=>{ const e=r['Estado / Entrega']||r.estado||''; if(e) cadEstMap[e]=(cadEstMap[e]||0)+1; });
+  const estadosPts = Object.entries(estPtsMap)
+    .filter(([k])=>k&&k!=='undefined')
+    .sort((a,b)=>b[1]-a[1]).slice(0,10)
+    .map(([e,p])=>({estado:e,pontos:p}));
+  const cadEstado = Object.entries(cadEstMap)
+    .sort((a,b)=>b[1]-a[1]).slice(0,10)
+    .map(([e,c])=>({estado:e,cadastros:c}));
+
+  // Area pontos (do campanhas)
+  const areaPtsMap={};
+  campData.forEach(c=>{ if(c.area) areaPtsMap[c.area]=(areaPtsMap[c.area]||0)+c.pontos; });
+  const areaPontos = Object.entries(areaPtsMap)
+    .sort((a,b)=>b[1]-a[1]).slice(0,10)
+    .map(([a,p])=>({area:a,pontos:p}));
+
+  // Estrelas turbinadas 2025
+  const estrelas = campData
+    .filter(c=>c.campanha.toLowerCase().includes('estrelas turbinadas'))
+    .sort((a,b)=>b.pontos-a.pontos)
+    .slice(0,12);
+
+  return {
+    kpis, tlLabels, tlCredito, tlDebito, monthly, meses, trimLabels, trimVals,
+    regData, vendData, campData, finAreaData, finCampTop,
+    estadosPts, cadEstado, areaPontos, estrelas,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS DE FORMATAÇÃO
+// ═══════════════════════════════════════════════════════════
+const fN=(v,d=0)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+const fR=(v,d=0)=>'R$ '+fN(v,d);
+const fM=(v)=>{
+  if(v>=1e9) return 'R$ '+fN(v/1e9,2)+' bi';
+  if(v>=1e6) return 'R$ '+fN(v/1e6,2)+' M';
+  if(v>=1e3) return 'R$ '+fN(v/1e3,1)+' K';
+  return fR(v);
+};
+const fP=(v)=>{
+  if(v>=1e9) return fN(v/1e9,2)+' bi';
+  if(v>=1e6) return fN(v/1e6,2)+' M';
+  if(v>=1e3) return fN(v/1e3,1)+' K';
+  return fN(v);
+};
+const rankNum=(i)=>{
+  const cls = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+  return `<span class="rank-num ${cls}">${i+1}</span>`;
+};
+const pillStatus=(s)=>{
+  const on = String(s).toUpperCase()==='ATIVO';
+  return `<span class="pill ${on?'pill-on':'pill-off'}">${on?'ATIVO':'INATIVO'}</span>`;
+};
+const pbar=(v,max,cls='')=>{
+  const pct=max>0?Math.min(v/max*100,100):0;
+  return `<div class="pbar-wrap"><div class="pbar"><div class="pfill ${cls}" style="width:${pct.toFixed(1)}%"></div></div><span class="pval">${pct.toFixed(0)}%</span></div>`;
+};
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════════════════════════
+function renderAll(){
+  renderInsights();
+  renderKPIs();
+  renderChartsExecutivo();
+  renderFinanceiro();
+  renderCampanhas();
+  renderRegional();
+  renderVendedores();
+  renderTemporal();
+  renderRanking();
+  document.getElementById('pgSub').textContent = SUBS.executivo;
+}
+
+// ─── INSIGHTS ────────────────────────────────────────────
+function renderInsights(){
+  const {kpis, regData, campData} = D;
+  const topReg = regData[0]?.regional||'—';
+  const topPts = fP(regData[0]?.pontos||0);
+  const topCamp= campData[0]?.campanha||'—';
+  const eng    = parseNum(kpis['Engajamento (%)']||79.02);
+  const total  = parseNum(kpis['Total Pontos Crédito']||0);
+  const ativos = parseNum(kpis['Vendedores Ativos (com pts)']||0);
+
+  const items = [
+    `Regional líder: <b>${topReg}</b> com <b>${topPts} pts</b>`,
+    `Campanha topo: <b>${topCamp.slice(0,30)}</b>`,
+    `Engajamento geral: <b>${fN(eng,2)}%</b> dos vendedores`,
+    `Total créditos: <b>${fP(total)} pts</b> acumulados`,
+    `Vendedores ativos: <b>${fN(ativos)}</b> no programa`,
+    `Total campanhas cadastradas: <b>${fN(parseNum(kpis['Total Campanhas']||401))}</b>`,
+  ];
+  document.getElementById('insightsStrip').innerHTML =
+    items.map(t=>`<div class="insight">💡 ${t}</div>`).join('');
+}
+
+// ─── KPIs ─────────────────────────────────────────────────
+function buildKPI(containerId, list){
+  document.getElementById(containerId).innerHTML = list.map(k=>`
+    <div class="kpi ${k.c||''}">
+      <div class="kpi-lbl">${k.label}</div>
+      <div class="kpi-val${k.sm?' sm':''}">${k.val}</div>
+      ${k.sub?`<span class="kpi-delta ${k.up?'up':'dn'}">${k.up?'↑':'↓'} ${k.sub}</span>`:''}
+    </div>`).join('');
+}
+
+function renderKPIs(){
+  const k = D.kpis;
+  const tc = parseNum(k['Total Pontos Crédito']||0);
+  const td = parseNum(k['Total Pontos Débito']||0);
+  const sp = parseNum(k['Saldo de Pontos']||0);
+  const tv = parseNum(k['Total Verba (R$)']||0);
+  const ta = parseNum(k['Total Atribuído (R$)']||0);
+  const tca= parseNum(k['Total Campanhas']||0);
+  const tve= parseNum(k['Total Vendedores Cadastrados']||0);
+  const va = parseNum(k['Vendedores Ativos (com pts)']||0);
+  const tm = parseNum(k['Ticket Médio (pts/transação)']||0);
+  const roi= parseNum(k['ROI Médio (Atrib/Verba)']||0);
+  const eng= parseNum(k['Engajamento (%)']||0);
+  const con= parseNum(k['Contratos Assinados']||0);
+
+  buildKPI('kpiExec',[
+    {label:'Total Pontos Creditados', val:fP(tc),     c:'',     sub:'Fev/23–Mai/26', up:true},
+    {label:'Pontos Debitados',        val:fP(td),     c:'red',  sub:'débitos registrados', up:false},
+    {label:'Saldo de Pontos',         val:fP(sp),     c:'cyan', sub:'crédito – débito', up:true},
+    {label:'Total Verba (R$)',        val:fM(tv),     c:'gold', sub:'orçamento total', up:true},
+    {label:'Atribuído a Usuários',    val:fM(ta),     c:'green',sub:`${fN(roi*100,2)}% da verba`, up:true},
+    {label:'Vendedores Ativos',       val:fN(va),     c:'',     sub:`de ${fN(tve)} cadastrados`, up:true},
+    {label:'Total Campanhas',         val:fN(tca),    c:'blue', sub:'campanhas no sistema', up:true},
+    {label:'Engajamento',             val:eng.toFixed(1)+'%', c:'green', sub:'ativação real', up:true},
+  ]);
+  buildKPI('kpiFin',[
+    {label:'Total Verba',             val:fM(tv),     c:'gold',sub:'orçamento total', up:true},
+    {label:'Total Atribuído',         val:fM(ta),     c:'green',sub:`${fN(roi*100,2)}% utilização`, up:true},
+    {label:'Saldo Disponível',        val:fM(tv-ta),  c:'cyan', sub:'não atribuído', up:false},
+    {label:'ROI (Atrib/Verba)',       val:fN(roi*100,2)+'%', c:'', sub:'eficiência', up:true},
+    {label:'Total Campanhas',         val:fN(tca),    c:'blue', sub:'cadastradas', up:true},
+  ]);
+  buildKPI('kpiCamp',[
+    {label:'Total Campanhas',         val:fN(tca),    c:'',    sub:'no sistema', up:true},
+    {label:'Total Pontos Dist.',      val:fP(tc),     c:'gold',sub:'pts creditados', up:true},
+    {label:'Ticket Médio',            val:fP(tm),sm:true, c:'cyan',sub:'pts/transação', up:true},
+    {label:'Participantes Únicos',    val:fN(va),     c:'green',sub:'CPFs distintos', up:true},
+  ]);
+  buildKPI('kpiReg',[
+    {label:'Regionais Ativas',        val:'6',        c:'',    sub:'regionais reais', up:true},
+    {label:'Maior Regional',          val:D.regData[0]?.regional||'—', sm:true, c:'gold'},
+    {label:'Total Cadastros',         val:fN(tve),    c:'cyan',sub:'vendedores', up:true},
+    {label:'Contratos Assinados',     val:fN(con),    c:'green',sub:`de ${fN(tve)}`, up:true},
+  ]);
+  buildKPI('kpiVend',[
+    {label:'Top Vendedor',            val:D.vendData[0]?.nome?.split(' ').slice(0,2).join(' ')||'—', sm:true, c:'gold'},
+    {label:'Pontos (1º lugar)',       val:fP(D.vendData[0]?.pontos||0), c:'', sub:'acumulado', up:true},
+    {label:'Ativos (pts > 0)',        val:fN(va),     c:'green',sub:'no período', up:true},
+    {label:'Cadastros Totais',        val:fN(tve),    c:'cyan'},
+  ]);
+  buildKPI('kpiTemp',[
+    {label:'Período',                 val:'Fev/23–Mai/26', sm:true, c:''},
+    {label:'Pico Mensal',             val:fP(Math.max(...D.tlCredito)), c:'gold', sub:'Jan/2024', up:true},
+    {label:'Média Mensal',            val:fP(D.tlCredito.reduce((a,b)=>a+b,0)/D.tlCredito.length), c:'cyan'},
+    {label:'Total Meses Ativos',      val:String(D.tlLabels.length), c:'green', sub:'meses com dados', up:true},
+  ]);
+}
+
+// ─── CHARTS EXECUTIVO ────────────────────────────────────
+function renderChartsExecutivo(){
+  const {tlLabels,tlCredito,regData,areaPontos,kpis} = D;
+
+  // Timeline
+  mkChart('chTimeline',{
+    type:'line',
+    data:{
+      labels:tlLabels,
+      datasets:[{
+        label:'Pontos Creditados',
+        data:tlCredito,
+        borderColor:C.p2,
+        backgroundColor:'rgba(124,58,237,.08)',
+        fill:true,tension:.4,pointRadius:2,borderWidth:2,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxRotation:45,maxTicksLimit:20}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+
+  // Regional Bar
+  mkChart('chRegBar',{
+    type:'bar',
+    data:{
+      labels:regData.map(r=>r.regional),
+      datasets:[{
+        label:'Pontos',
+        data:regData.map(r=>r.pontos),
+        backgroundColor:regData.map((_,i)=>C.pal[i]+'99'),
+        borderColor:regData.map((_,i)=>C.pal[i]),
+        borderWidth:1,borderRadius:5,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+
+  // Area Doughnut
+  mkChart('chAreaDono',{
+    type:'doughnut',
+    data:{
+      labels:areaPontos.map(a=>a.area),
+      datasets:[{
+        data:areaPontos.map(a=>a.pontos),
+        backgroundColor:C.pal.map(c=>c+'cc'),
+        borderWidth:0,hoverOffset:6,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+      plugins:{legend:{position:'right',labels:{color:'rgba(241,240,255,.6)',padding:10,boxWidth:10,font:{size:11}}}}
+    }
+  });
+
+  // Anual
+  const anos = [2023,2024,2025,2026];
+  const anoVals = anos.map(y=>D.monthly[y]?.reduce((a,b)=>a+b,0)||0);
+  mkChart('chAnual',{
+    type:'bar',
+    data:{
+      labels:anos.map(String),
+      datasets:[{
+        label:'Total Pontos',
+        data:anoVals,
+        backgroundColor:[C.p1+'aa',C.gold+'aa',C.cyan+'aa',C.green+'aa'],
+        borderColor:[C.p1,C.gold,C.cyan,C.green],
+        borderWidth:1,borderRadius:7,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────
+function renderFinanceiro(){
+  const {finAreaData, finCampTop} = D;
+  const top8 = finAreaData.slice(0,8);
+
+  // Verba vs Atribuido
+  mkChart('chFinArea',{
+    type:'bar',
+    data:{
+      labels:top8.map(a=>a.area),
+      datasets:[
+        {label:'Verba Total',data:top8.map(a=>a.verba),
+          backgroundColor:C.p1+'88',borderColor:C.p1,borderWidth:1,borderRadius:4},
+        {label:'Atribuído',data:top8.map(a=>a.atribuido),
+          backgroundColor:C.green+'88',borderColor:C.green,borderWidth:1,borderRadius:4},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'rgba(241,240,255,.6)',boxWidth:10}}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxRotation:30}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fM(v)}}
+      }
+    }
+  });
+
+  // Utilização %
+  mkChart('chUtilizacao',{
+    type:'bar',
+    data:{
+      labels:top8.map(a=>a.area),
+      datasets:[{
+        label:'Utilização (%)',
+        data:top8.map(a=>a.verba>0?+(a.atribuido/a.verba*100).toFixed(2):0),
+        backgroundColor:top8.map(a=>{
+          const pct=a.verba>0?a.atribuido/a.verba*100:0;
+          return pct>80?C.green+'aa':pct>40?C.gold+'aa':C.red+'aa';
+        }),
+        borderRadius:5,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxRotation:30}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},max:100,ticks:{callback:v=>v+'%'}}
+      }
+    }
+  });
+
+  // Tabela financeiro campanhas
+  document.getElementById('bodyFinCamp').innerHTML = finCampTop.map((c,i)=>`
+    <tr>
+      <td>${rankNum(i)}</td>
+      <td class="td-name" title="${c.campanha}">${c.campanha.length>38?c.campanha.slice(0,38)+'…':c.campanha}</td>
+      <td>${c.area}</td>
+      <td class="td-val">${fM(c.verba)}</td>
+      <td class="td-val" style="color:${C.green}">${fM(c.atribuido)}</td>
+      <td>${pillStatus(c.status)}</td>
+    </tr>`).join('');
+}
+
+// ─── CAMPANHAS ────────────────────────────────────────────
+function renderCampanhas(){
+  const {campData, estrelas} = D;
+  const top20 = campData.slice(0,20);
+
+  // Top 20 horizontal bar
+  mkChart('chTopCamp',{
+    type:'bar',
+    data:{
+      labels:top20.map(c=>c.campanha.length>30?c.campanha.slice(0,30)+'…':c.campanha),
+      datasets:[{
+        label:'Pontos',
+        data:top20.map(c=>c.pontos),
+        backgroundColor:top20.map((_,i)=>C.pal[i%C.pal.length]+'99'),
+        borderColor:top20.map((_,i)=>C.pal[i%C.pal.length]),
+        borderWidth:1,borderRadius:4,
+      }]
+    },
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},
+        y:{grid:{display:false},ticks:{font:{size:10}}}
+      }
+    }
+  });
+
+  // Estrelas Turbinadas
+  mkChart('chEstrelas',{
+    type:'bar',
+    data:{
+      labels:estrelas.map(c=>c.campanha.replace(/CAMPANHA ESTRELAS TURBINADAS\s*/i,'').replace(/ESTRELAS TURBINADAS\s*/i,'')),
+      datasets:[{
+        label:'Pontos',
+        data:estrelas.map(c=>c.pontos),
+        backgroundColor:C.gold+'99',borderColor:C.gold,borderWidth:1,borderRadius:5,
+      }]
+    },
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},
+        y:{grid:{display:false},ticks:{font:{size:10}}}
+      }
+    }
+  });
+
+  // Paginação campanhas
+  campPage = 1;
+  renderCampTable();
+}
+
+let campSort = {col:-1, asc:true};
+function renderCampTable(){
+  const {campData} = D;
+  const total = campData.length;
+  const pages = Math.ceil(total/PAGE_SZ);
+  const slice = campData.slice((campPage-1)*PAGE_SZ, campPage*PAGE_SZ);
+  const offset = (campPage-1)*PAGE_SZ;
+
+  document.getElementById('bodyAllCamp').innerHTML = slice.map((c,i)=>`
+    <tr>
+      <td>${offset+i+1}</td>
+      <td class="td-name" title="${c.campanha}">${c.campanha.length>45?c.campanha.slice(0,45)+'…':c.campanha}</td>
+      <td class="td-pts">${fP(c.pontos)}</td>
+      <td>${fN(c.participantes)}</td>
+      <td>${fN(c.transacoes)}</td>
+    </tr>`).join('');
+
+  document.getElementById('pagCamp').innerHTML = pagHtml('campPage', campPage, pages, total);
+}
+
+// ─── REGIONAL ─────────────────────────────────────────────
+function renderRegional(){
+  const {regData, estadosPts, cadEstado} = D;
+  const maxPts = Math.max(...regData.map(r=>r.pontos));
+
+  // Cards
+  document.getElementById('regCards').innerHTML = regData.map(r=>`
+    <div class="reg-card">
+      <div class="reg-name">${r.regional}</div>
+      <div class="reg-val">${fP(r.pontos)}</div>
+      <div class="reg-meta">
+        <span>${fN(r.ativos)} ativos</span>
+        <span>${fN(r.cadastros)} cad.</span>
+      </div>
+      ${pbar(r.pontos, maxPts, '')}
+    </div>`).join('');
+
+  // Estados pontos
+  mkChart('chEstado',{
+    type:'bar',
+    data:{
+      labels:estadosPts.map(e=>e.estado),
+      datasets:[{
+        label:'Pontos',
+        data:estadosPts.map(e=>e.pontos),
+        backgroundColor:estadosPts.map((_,i)=>C.pal[i%C.pal.length]+'aa'),
+        borderRadius:5,
+      }]
+    },
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}},
+        y:{grid:{display:false}}
+      }
+    }
+  });
+
+  // Cadastros por estado
+  mkChart('chCadEstado',{
+    type:'bar',
+    data:{
+      labels:cadEstado.map(e=>e.estado),
+      datasets:[{
+        label:'Cadastros',
+        data:cadEstado.map(e=>e.cadastros),
+        backgroundColor:C.cyan+'88',borderColor:C.cyan,borderWidth:1,borderRadius:4,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'rgba(255,255,255,.04)'}}
+      }
+    }
+  });
+}
+
+// ─── VENDEDORES ───────────────────────────────────────────
+function renderVendedores(){
+  vendPage=1;
+  renderVendTable();
+}
+
+function renderVendTable(){
+  const {vendData} = D;
+  const total = vendData.length;
+  const pages = Math.ceil(total/PAGE_SZ);
+  const slice = vendData.slice((vendPage-1)*PAGE_SZ, vendPage*PAGE_SZ);
+  const maxPts = vendData[0]?.pontos||1;
+
+  document.getElementById('bodyVend').innerHTML = slice.map((v,i)=>`
+    <tr>
+      <td>${rankNum((vendPage-1)*PAGE_SZ+i)}</td>
+      <td class="td-name">${v.nome}</td>
+      <td>${v.regional}</td>
+      <td>${v.estado}</td>
+      <td class="td-pts">${fP(v.pontos)}</td>
+      <td>${pbar(v.pontos,maxPts,'')}</td>
+    </tr>`).join('');
+
+  document.getElementById('pagVend').innerHTML = pagHtml('vendPage', vendPage, pages, total);
+}
+
+// ─── TEMPORAL ─────────────────────────────────────────────
+function renderTemporal(){
+  buildComparativo();
+
+  // Timeline All
+  mkChart('chTimelineAll',{
+    type:'line',
+    data:{
+      labels:D.tlLabels,
+      datasets:[{
+        label:'Pontos',
+        data:D.tlCredito,
+        borderColor:C.p4,
+        backgroundColor:'rgba(192,132,252,.07)',
+        fill:true,tension:.4,pointRadius:1.5,borderWidth:2,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxRotation:45,maxTicksLimit:18}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+
+  // Trimestral
+  mkChart('chTrimestral',{
+    type:'bar',
+    data:{
+      labels:D.trimLabels,
+      datasets:[{
+        label:'Pontos',
+        data:D.trimVals,
+        backgroundColor:D.trimLabels.map((_,i)=>C.pal[i%C.pal.length]+'99'),
+        borderRadius:5,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxRotation:45}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+}
+
+function buildComparativo(){
+  const {monthly, meses} = D;
+  const datasets = [];
+  const cfgs = {
+    '2023':{color:C.cyan,  dash:[]},
+    '2024':{color:C.gold,  dash:[]},
+    '2025':{color:C.p4,    dash:[]},
+  };
+  Object.entries(cfgs).forEach(([y,cfg])=>{
+    if(visibleYears[y]){
+      datasets.push({
+        label:y,
+        data:monthly[y]||Array(12).fill(0),
+        borderColor:cfg.color,
+        backgroundColor:cfg.color+'15',
+        fill:false,tension:.4,pointRadius:3,borderWidth:2,
+        borderDash:cfg.dash,
+      });
+    }
+  });
+  mkChart('chComparativo',{
+    type:'line',
+    data:{labels:meses, datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'rgba(241,240,255,.6)',boxWidth:12,padding:14}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>fP(v)}}
+      }
+    }
+  });
+}
+
+function toggleYear(yr, btn){
+  visibleYears[yr] = !visibleYears[yr];
+  btn.classList.toggle('active', visibleYears[yr]);
+  buildComparativo();
+}
+
+// ─── RANKING ──────────────────────────────────────────────
+function renderRanking(){
+  const {vendData, regData, campData} = D;
+  const maxV = vendData[0]?.pontos||1;
+  const maxR = regData[0]?.pontos||1;
+  const maxC = campData[0]?.pontos||1;
+
+  document.getElementById('rankVend20').innerHTML =
+    vendData.slice(0,20).map((v,i)=>`
+      <tr>
+        <td>${rankNum(i)}</td>
+        <td class="td-name">${v.nome}</td>
+        <td><span style="font-size:11px;color:var(--txt3)">${v.regional}</span></td>
+        <td class="td-pts">${fP(v.pontos)}</td>
+      </tr>`).join('');
+
+  document.getElementById('rankReg').innerHTML =
+    regData.map((r,i)=>`
+      <tr>
+        <td>${rankNum(i)}</td>
+        <td class="td-name">${r.regional}</td>
+        <td class="td-pts">${fP(r.pontos)}</td>
+        <td>${fN(r.ativos)}</td>
+        <td>${pbar(r.pontos,maxR,'')}</td>
+      </tr>`).join('');
+
+  document.getElementById('rankCamp10').innerHTML =
+    campData.slice(0,10).map((c,i)=>`
+      <tr>
+        <td>${rankNum(i)}</td>
+        <td class="td-name" title="${c.campanha}" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${c.campanha.length>35?c.campanha.slice(0,35)+'…':c.campanha}</td>
+        <td class="td-pts">${fP(c.pontos)}</td>
+      </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PAGINATION
+// ═══════════════════════════════════════════════════════════
+function pagHtml(varName, cur, total, count){
+  if(total<=1) return '';
+  return `
+    <button class="pag-btn" onclick="changePage('${varName}',-1)" ${cur<=1?'disabled':''}>‹ Anterior</button>
+    <span class="pag-info">Pág ${cur}/${total} · ${fN(count)} registros</span>
+    <button class="pag-btn" onclick="changePage('${varName}',1)" ${cur>=total?'disabled':''}>Próxima ›</button>`;
+}
+function changePage(varName, dir){
+  if(varName==='campPage'){ campPage+=dir; renderCampTable(); }
+  if(varName==='vendPage'){ vendPage+=dir; renderVendTable(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TABLE SORT
+// ═══════════════════════════════════════════════════════════
+const sortState={};
+function sortTable(tblId, colIdx){
+  const tbl = document.getElementById(tblId);
+  const tbody = tbl.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const key = tblId+'_'+colIdx;
+  sortState[key] = !sortState[key];
+  const asc = sortState[key];
+  rows.sort((a,b)=>{
+    const av = a.cells[colIdx]?.innerText.trim()||'';
+    const bv = b.cells[colIdx]?.innerText.trim()||'';
+    const an = parseFloat(av.replace(/[^0-9.,]/g,'').replace(',','.'));
+    const bn = parseFloat(bv.replace(/[^0-9.,]/g,'').replace(',','.'));
+    if(!isNaN(an)&&!isNaN(bn)) return asc?an-bn:bn-an;
+    return asc?av.localeCompare(bv,'pt-BR'):bv.localeCompare(av,'pt-BR');
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TABLE FILTER
+// ═══════════════════════════════════════════════════════════
+function filterTbl(bodyId, q){
+  document.getElementById(bodyId)?.querySelectorAll('tr').forEach(r=>{
+    r.style.display = r.innerText.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EXPORT CSV
+// ═══════════════════════════════════════════════════════════
+function exportCSV(){
+  if(!D) return;
+  const h = ['Rank','Vendedor','Regional','Estado','Pontos'];
+  const rows = D.vendData.map(v=>[v.rank,v.nome,v.regional,v.estado,v.pontos]);
+  const csv = [h,...rows].map(r=>r.join(';')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='incentivale_vendedores.csv'; a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    const page = item.dataset.page;
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('pg-'+page)?.classList.add('active');
+    document.getElementById('pgTitle').textContent = PAGES[page]||page;
+    document.getElementById('pgSub').textContent   = SUBS[page]||'';
+    if(window.innerWidth<=768) closeSidebar();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SIDEBAR MOBILE
+// ═══════════════════════════════════════════════════════════
+document.getElementById('mobToggle').addEventListener('click',()=>{
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+});
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RELOAD
+// ═══════════════════════════════════════════════════════════
+function reloadXLSX(){
+  document.getElementById('loadScreen').classList.remove('hidden');
+  Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});
+  charts={};
+  loadXLSX();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HIDE LOADER
+// ═══════════════════════════════════════════════════════════
+function hideLoader(){
+  setTimeout(()=>{
+    document.getElementById('loadScreen').classList.add('hidden');
+  },600);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', loadXLSX);
+</script>
+</body>
+</html>
