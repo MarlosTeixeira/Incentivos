@@ -125,9 +125,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .kpi-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3);
   font-weight:700;margin-bottom:10px;}
 /* Tamanho automático de acordo com comprimento do valor */
-.kpi-val{font-family:var(--ff);font-weight:800;color:var(--txt);line-height:1.2;
-  margin-bottom:8px;font-size:18px;white-space:nowrap;overflow:hidden;
-  text-overflow:clip;}
+.kpi-val{font-family:var(--ff);font-weight:800;color:var(--txt);line-height:1.15;
+  margin-bottom:8px;font-size:clamp(14px,2.4vw,26px);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;}
 .kpi-delta{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;
   padding:3px 8px;border-radius:20px;}
 .up{background:rgba(16,185,129,.12);color:#10b981;}
